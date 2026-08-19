@@ -1,0 +1,693 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cover: #16241d;
+  --color-cover-2: #1f3529;
+  --color-paper: #f6f1e4;
+  --color-paper-2: #eee6d2;
+  --color-ink: #1c2b21;
+  --color-ink-soft: #4a5a4e;
+  --color-rule: #d9cfb2;
+  --color-receita: #3f8f5c;
+  --color-receita-bg: #e4f0e6;
+  --color-despesa: #ae3d33;
+  --color-despesa-bg: #f4e6e0;
+  --color-gold: #b9862e;
+  --color-gold-2: #d7ab5b;
+
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'SFMono-Regular', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  color: var(--color-ink);
+  background: var(--color-paper);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- App shell ---------- */
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  background: linear-gradient(180deg, var(--color-cover) 0%, var(--color-cover-2) 100%);
+  color: #f1ece0;
+  padding: 28px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.brand-mark {
+  font-family: var(--font-display);
+  font-size: 28px;
+  color: var(--color-gold-2);
+}
+
+.brand-name {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-link {
+  color: #d9d3c2;
+  text-decoration: none;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  border-left: 2px solid transparent;
+  transition: background 0.15s, color 0.15s;
+}
+
+.nav-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.nav-link.active {
+  background: rgba(215, 171, 91, 0.14);
+  border-left-color: var(--color-gold-2);
+  color: var(--color-gold-2);
+}
+
+.sair-btn {
+  margin-top: auto;
+  color: #b8b2a1;
+}
+
+.main-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.topbar {
+  padding: 20px 32px 0;
+}
+
+.content {
+  padding: 20px 32px 48px;
+  flex: 1;
+}
+
+/* ---------- Competência tabs ---------- */
+
+.competencia-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-paper-2);
+  border: 1px solid var(--color-rule);
+  border-radius: 999px;
+  padding: 6px 10px;
+}
+
+.tab-arrow {
+  background: none;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 50%;
+}
+
+.tab-arrow:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.tab-select, .tab-year {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  background: transparent;
+  border: none;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.tab-year {
+  width: 62px;
+  cursor: text;
+}
+
+.tab-select:focus, .tab-year:focus {
+  outline: none;
+}
+
+/* ---------- Cards / ledger surfaces ---------- */
+
+.ledger-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    linear-gradient(180deg, var(--color-cover) 0%, var(--color-cover-2) 100%);
+}
+
+.ledger-card {
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule);
+  border-radius: 10px;
+  padding: 24px;
+  box-shadow: 0 1px 2px rgba(22, 36, 29, 0.06);
+}
+
+/* ---------- Login ---------- */
+
+.login-page {
+  position: relative;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.login-stamp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--color-gold-2);
+  border: 3px solid var(--color-gold-2);
+  border-radius: 50%;
+  width: 96px;
+  height: 96px;
+  justify-content: center;
+  transform: rotate(-8deg);
+  font-family: var(--font-display);
+  opacity: 0.9;
+}
+
+.stamp-line-1, .stamp-line-2 {
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+}
+
+.login-card {
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.login-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  margin: 0;
+}
+
+.login-subtitle {
+  margin: -8px 0 8px;
+  color: var(--color-ink-soft);
+  font-size: 14px;
+}
+
+/* ---------- Forms ---------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-ink-soft);
+  font-weight: 500;
+  flex: 1;
+  margin-bottom: 14px;
+}
+
+.field input, .field select, .field textarea {
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: var(--color-ink);
+  background: #fff;
+  border: 1px solid var(--color-rule);
+  border-radius: 6px;
+  padding: 9px 11px;
+}
+
+.field input:focus, .field select:focus, .field textarea:focus {
+  outline: 2px solid var(--color-gold-2);
+  outline-offset: 1px;
+}
+
+.field-row {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.field-row .field {
+  margin-bottom: 0;
+}
+
+.field-hint {
+  font-size: 12.5px;
+  color: var(--color-ink-soft);
+  margin: -6px 0 14px;
+}
+
+.checkboxes {
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--color-ink-soft);
+}
+
+.form-card {
+  max-width: 640px;
+}
+
+.form-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+
+.config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: 6px;
+  padding: 10px 18px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--color-cover);
+  color: #f6f1e4;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.btn-primary:hover {
+  background: var(--color-cover-2);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: var(--color-rule);
+  color: var(--color-ink);
+}
+
+.btn-ghost:hover {
+  background: var(--color-paper-2);
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--color-gold);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+}
+
+.seed-btn {
+  margin-top: 16px;
+  width: 100%;
+}
+
+/* ---------- Messages ---------- */
+
+.msg {
+  font-size: 13.5px;
+  margin: 4px 0 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+}
+
+.msg-erro {
+  background: var(--color-despesa-bg);
+  color: var(--color-despesa);
+}
+
+.msg-aviso, .msg-sucesso {
+  background: var(--color-receita-bg);
+  color: var(--color-receita);
+}
+
+.loading-msg {
+  color: #f1ece0;
+}
+
+/* ---------- Dashboard totals ---------- */
+
+.totals-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 16px;
+  margin-bottom: 20px;
+  align-items: stretch;
+}
+
+.total-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: center;
+}
+
+.total-label {
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-ink-soft);
+}
+
+.total-value {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.total-receita .total-value { color: var(--color-receita); }
+.total-despesa .total-value { color: var(--color-despesa); }
+
+.stamp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 170px;
+  border: 3px double currentColor;
+  border-radius: 10px;
+  padding: 10px 18px;
+  transform: rotate(-2deg);
+}
+
+.stamp-positivo { color: var(--color-receita); }
+.stamp-negativo { color: var(--color-despesa); }
+
+.stamp-title {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.stamp-value {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* ---------- List toolbar / filters ---------- */
+
+.list-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.chip {
+  border: 1px solid var(--color-rule);
+  background: var(--color-paper-2);
+  color: var(--color-ink-soft);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.chip.active {
+  background: var(--color-cover);
+  color: #f6f1e4;
+  border-color: var(--color-cover);
+}
+
+.tipo-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.chip-despesa.active { background: var(--color-despesa); border-color: var(--color-despesa); }
+.chip-receita.active { background: var(--color-receita); border-color: var(--color-receita); }
+
+/* ---------- Table ---------- */
+
+.ledger-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.ledger-table thead th {
+  text-align: left;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-ink-soft);
+  border-bottom: 1px solid var(--color-rule);
+  padding: 8px 10px;
+}
+
+.ledger-table tbody td {
+  padding: 10px 10px;
+  border-bottom: 1px solid var(--color-rule);
+  vertical-align: middle;
+}
+
+.ledger-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.row-despesa .col-valor { color: var(--color-despesa); }
+.row-receita .col-valor { color: var(--color-receita); }
+
+.col-valor {
+  text-align: right;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.col-pago, .col-acoes {
+  text-align: center;
+  width: 1%;
+  white-space: nowrap;
+}
+
+.pago-toggle {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--color-rule);
+  background: #fff;
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.pago-toggle.pago {
+  background: var(--color-receita);
+  color: #fff;
+  border-color: var(--color-receita);
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+.icon-btn:hover {
+  background: var(--color-paper-2);
+}
+
+.icon-btn-danger:hover {
+  color: var(--color-despesa);
+}
+
+.badge-parcela, .badge-recorrente {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 10.5px;
+  font-family: var(--font-mono);
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--color-paper-2);
+  color: var(--color-ink-soft);
+}
+
+.empty-state {
+  color: var(--color-ink-soft);
+  font-size: 14px;
+  text-align: center;
+  padding: 24px 0;
+}
+
+/* ---------- Config page ---------- */
+
+.config-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.inline-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.inline-form input {
+  flex: 1;
+  font-size: 14px;
+  border: 1px solid var(--color-rule);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.inline-form select {
+  border: 1px solid var(--color-rule);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.simple-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.simple-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--color-rule);
+  font-size: 14px;
+}
+
+.simple-list li span:first-child {
+  flex: 1;
+}
+
+.tag {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.tag-despesa { background: var(--color-despesa-bg); color: var(--color-despesa); }
+.tag-receita { background: var(--color-receita-bg); color: var(--color-receita); }
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 860px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  .sidebar {
+    flex-direction: row;
+    align-items: center;
+    padding: 14px 16px;
+    gap: 16px;
+    overflow-x: auto;
+  }
+  .nav {
+    flex-direction: row;
+  }
+  .sair-btn {
+    margin-top: 0;
+  }
+  .content, .topbar {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .totals-row {
+    grid-template-columns: 1fr;
+  }
+  .config-grid {
+    grid-template-columns: 1fr;
+  }
+  .field-row {
+    flex-direction: column;
+  }
+  .ledger-table {
+    font-size: 13px;
+  }
+}
