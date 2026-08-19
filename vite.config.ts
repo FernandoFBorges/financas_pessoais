@@ -5,7 +5,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // Nome do repositório no GitHub — usado como base path para o GitHub Pages.
 // Se o nome do seu repositório for diferente, troque aqui.
-const REPO_NAME = 'financas-app'
+const REPO_NAME = 'financas_pessoais'
 
 export default defineConfig(({ mode }) => ({
   base: mode === 'production' ? `/${REPO_NAME}/` : '/',
