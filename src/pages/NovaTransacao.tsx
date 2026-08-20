@@ -1,26 +1,43 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useCompetencia } from '../context/CompetenciaContext'
 import { useLookups } from '../lib/useLookups'
 import { MESES, type Tipo } from '../lib/types'
 
+interface DuplicadoState {
+  duplicado?: boolean
+  tipo?: Tipo
+  descricao?: string
+  categoria_id?: string | null
+  meio_pagamento_id?: string | null
+  valor?: number
+  competencia_mes?: number
+  competencia_ano?: number
+  observacao?: string | null
+}
+
 export default function NovaTransacao() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { mes, ano } = useCompetencia()
   const { categories, paymentMethods } = useLookups()
 
-  const [tipo, setTipo] = useState<Tipo>('despesa')
-  const [descricao, setDescricao] = useState('')
-  const [categoriaId, setCategoriaId] = useState('')
-  const [meioId, setMeioId] = useState('')
-  const [valor, setValor] = useState('')
+  const preenchido = (location.state as DuplicadoState | null) ?? null
+  const veioDuplicado = preenchido?.duplicado === true
+
+  const [tipo, setTipo] = useState<Tipo>(preenchido?.tipo ?? 'despesa')
+  const [descricao, setDescricao] = useState(preenchido?.descricao ?? '')
+  const [categoriaId, setCategoriaId] = useState(preenchido?.categoria_id ?? '')
+  const [meioId, setMeioId] = useState(preenchido?.meio_pagamento_id ?? '')
+  const [valor, setValor] = useState(preenchido?.valor != null ? String(preenchido.valor) : '')
+  const [valorEfetivo, setValorEfetivo] = useState('')
   const [dataLancamento, setDataLancamento] = useState(new Date().toISOString().slice(0, 10))
-  const [competenciaMes, setCompetenciaMes] = useState(mes)
-  const [competenciaAno, setCompetenciaAno] = useState(ano)
+  const [competenciaMes, setCompetenciaMes] = useState(preenchido?.competencia_mes ?? mes)
+  const [competenciaAno, setCompetenciaAno] = useState(preenchido?.competencia_ano ?? ano)
   const [pago, setPago] = useState(false)
-  const [recorrente, setRecorrente] = useState(false)
-  const [observacao, setObservacao] = useState('')
+  const [recorrente, setRecorrente] = useState(veioDuplicado)
+  const [observacao, setObservacao] = useState(preenchido?.observacao ?? '')
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [sucesso, setSucesso] = useState(false)
@@ -39,6 +56,7 @@ export default function NovaTransacao() {
       categoria_id: categoriaId || null,
       meio_pagamento_id: meioId || null,
       valor: Number(valor.replace(',', '.')),
+      valor_efetivo: valorEfetivo ? Number(valorEfetivo.replace(',', '.')) : null,
       data_lancamento: dataLancamento,
       competencia_mes: competenciaMes,
       competencia_ano: competenciaAno,
@@ -57,12 +75,22 @@ export default function NovaTransacao() {
     setSucesso(true)
     setDescricao('')
     setValor('')
+    setValorEfetivo('')
     setObservacao('')
+    // Limpa o estado de duplicação depois de salvar, pra próximo lançamento começar do zero
+    navigate('.', { replace: true, state: null })
   }
 
   return (
     <div className="ledger-card form-card">
       <h2 className="form-title">Novo lançamento</h2>
+
+      {veioDuplicado && (
+        <p className="msg msg-aviso">
+          Lançamento duplicado a partir de outro — confira os dados abaixo (a competência já foi
+          avançada pro mês seguinte) e ajuste o que precisar antes de salvar.
+        </p>
+      )}
 
       <form onSubmit={handleSubmit}>
         <div className="tipo-toggle">
@@ -89,10 +117,21 @@ export default function NovaTransacao() {
 
         <div className="field-row">
           <label className="field">
-            <span>Valor (R$)</span>
+            <span>Valor previsto (R$)</span>
             <input required inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" />
           </label>
 
+          <label className="field">
+            <span>Valor efetivo (R$) — opcional</span>
+            <input inputMode="decimal" value={valorEfetivo} onChange={(e) => setValorEfetivo(e.target.value)} placeholder="deixe em branco se ainda não souber" />
+          </label>
+        </div>
+        <p className="field-hint">
+          Previsto é o que você planeja/espera. Efetivo é o que realmente foi pago ou recebido —
+          preencha quando souber, ou deixe em branco e ajuste depois na lista de lançamentos.
+        </p>
+
+        <div className="field-row">
           <label className="field">
             <span>Categoria</span>
             <select value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)}>
@@ -102,9 +141,7 @@ export default function NovaTransacao() {
               ))}
             </select>
           </label>
-        </div>
 
-        <div className="field-row">
           <label className="field">
             <span>Meio de pagamento</span>
             <select value={meioId} onChange={(e) => setMeioId(e.target.value)}>
@@ -114,12 +151,12 @@ export default function NovaTransacao() {
               ))}
             </select>
           </label>
-
-          <label className="field">
-            <span>Data do lançamento</span>
-            <input type="date" required value={dataLancamento} onChange={(e) => setDataLancamento(e.target.value)} />
-          </label>
         </div>
+
+        <label className="field">
+          <span>Data do lançamento</span>
+          <input type="date" required value={dataLancamento} onChange={(e) => setDataLancamento(e.target.value)} />
+        </label>
 
         <p className="field-hint">
           A competência é o mês/ano a que esse lançamento pertence de fato — pode ser diferente da data acima.

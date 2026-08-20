@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useCompetencia } from '../context/CompetenciaContext'
 import { useLookups } from '../lib/useLookups'
 import { formatBRL, type Transaction } from '../lib/types'
 
 export default function Dashboard() {
+  const navigate = useNavigate()
   const { mes, ano } = useCompetencia()
   const { categories, paymentMethods } = useLookups()
   const [items, setItems] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState<'todos' | 'despesa' | 'receita'>('todos')
+  const [editandoEfetivoId, setEditandoEfetivoId] = useState<string | null>(null)
+  const [efetivoInput, setEfetivoInput] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -31,37 +34,64 @@ export default function Dashboard() {
   const nomeCategoria = (id: string | null) => categories.find((c) => c.id === id)?.nome ?? '—'
   const nomeMeio = (id: string | null) => paymentMethods.find((p) => p.id === id)?.nome ?? '—'
 
+  // Valor efetivo "realizado": usa o valor efetivo se já foi preenchido,
+  // senão usa o previsto quando já está marcado como pago, senão é zero (ainda não realizado).
+  const valorEfetivoRealizado = (t: Transaction) => {
+    if (t.valor_efetivo != null) return Number(t.valor_efetivo)
+    if (t.pago) return Number(t.valor)
+    return 0
+  }
+
   const receitas = items.filter((i) => i.tipo === 'receita')
   const despesas = items.filter((i) => i.tipo === 'despesa')
-  const totalReceitas = receitas.reduce((s, i) => s + Number(i.valor), 0)
-  const totalDespesas = despesas.reduce((s, i) => s + Number(i.valor), 0)
-  const saldo = totalReceitas - totalDespesas
+
+  const previstoReceitas = receitas.reduce((s, i) => s + Number(i.valor), 0)
+  const previstoDespesas = despesas.reduce((s, i) => s + Number(i.valor), 0)
+  const saldoPrevisto = previstoReceitas - previstoDespesas
+
+  const efetivoReceitas = receitas.reduce((s, i) => s + valorEfetivoRealizado(i), 0)
+  const efetivoDespesas = despesas.reduce((s, i) => s + valorEfetivoRealizado(i), 0)
+  const saldoEfetivo = efetivoReceitas - efetivoDespesas
 
   const visiveis = items.filter((i) => filtro === 'todos' || i.tipo === filtro)
 
-  async function duplicarParaProximoMes(t: Transaction) {
+  function duplicar(t: Transaction) {
     const novoMes = t.competencia_mes === 12 ? 1 : t.competencia_mes + 1
     const novoAno = t.competencia_mes === 12 ? t.competencia_ano + 1 : t.competencia_ano
 
-    const { error } = await supabase.from('transactions').insert({
-      tipo: t.tipo,
-      descricao: t.descricao,
-      categoria_id: t.categoria_id,
-      meio_pagamento_id: t.meio_pagamento_id,
-      valor: t.valor,
-      data_lancamento: new Date().toISOString().slice(0, 10),
-      competencia_mes: novoMes,
-      competencia_ano: novoAno,
-      pago: false,
-      recorrente: true,
-      observacao: t.observacao,
+    navigate('/nova', {
+      state: {
+        duplicado: true,
+        tipo: t.tipo,
+        descricao: t.descricao,
+        categoria_id: t.categoria_id,
+        meio_pagamento_id: t.meio_pagamento_id,
+        valor: Number(t.valor),
+        competencia_mes: novoMes,
+        competencia_ano: novoAno,
+        observacao: t.observacao,
+      },
     })
-
-    if (!error) load()
   }
 
   async function togglePago(t: Transaction) {
-    await supabase.from('transactions').update({ pago: !t.pago }).eq('id', t.id)
+    const novoPago = !t.pago
+    // Ao marcar como pago, se ainda não tem valor efetivo definido, usa o previsto como sugestão inicial.
+    const patch: Partial<Transaction> =
+      novoPago && t.valor_efetivo == null ? { pago: novoPago, valor_efetivo: t.valor } : { pago: novoPago }
+    await supabase.from('transactions').update(patch).eq('id', t.id)
+    load()
+  }
+
+  function iniciarEdicaoEfetivo(t: Transaction) {
+    setEditandoEfetivoId(t.id)
+    setEfetivoInput(t.valor_efetivo != null ? String(t.valor_efetivo) : '')
+  }
+
+  async function salvarEfetivo(t: Transaction) {
+    const valor = efetivoInput.trim() === '' ? null : Number(efetivoInput.replace(',', '.'))
+    await supabase.from('transactions').update({ valor_efetivo: valor }).eq('id', t.id)
+    setEditandoEfetivoId(null)
     load()
   }
 
@@ -82,16 +112,19 @@ export default function Dashboard() {
     <div>
       <div className="totals-row">
         <div className="ledger-card total-card total-receita">
-          <span className="total-label">Receitas</span>
-          <span className="total-value">{formatBRL(totalReceitas)}</span>
+          <span className="total-label">Receitas — previsto</span>
+          <span className="total-value">{formatBRL(previstoReceitas)}</span>
+          <span className="total-sub">Efetivo: {formatBRL(efetivoReceitas)}</span>
         </div>
         <div className="ledger-card total-card total-despesa">
-          <span className="total-label">Despesas</span>
-          <span className="total-value">{formatBRL(totalDespesas)}</span>
+          <span className="total-label">Despesas — previsto</span>
+          <span className="total-value">{formatBRL(previstoDespesas)}</span>
+          <span className="total-sub">Efetivo: {formatBRL(efetivoDespesas)}</span>
         </div>
-        <div className={'stamp ' + (saldo >= 0 ? 'stamp-positivo' : 'stamp-negativo')}>
-          <span className="stamp-title">{saldo >= 0 ? 'SALDO POSITIVO' : 'SALDO NEGATIVO'}</span>
-          <span className="stamp-value">{formatBRL(saldo)}</span>
+        <div className={'stamp ' + (saldoPrevisto >= 0 ? 'stamp-positivo' : 'stamp-negativo')}>
+          <span className="stamp-title">{saldoPrevisto >= 0 ? 'SALDO PREVISTO +' : 'SALDO PREVISTO -'}</span>
+          <span className="stamp-value">{formatBRL(saldoPrevisto)}</span>
+          <span className="stamp-sub">Efetivo até agora: {formatBRL(saldoEfetivo)}</span>
         </div>
       </div>
 
@@ -117,7 +150,8 @@ export default function Dashboard() {
                 <th>Categoria</th>
                 <th>Meio</th>
                 <th>Lançado em</th>
-                <th className="col-valor">Valor</th>
+                <th className="col-valor">Previsto</th>
+                <th className="col-valor">Efetivo</th>
                 <th className="col-pago">Pago</th>
                 <th className="col-acoes"></th>
               </tr>
@@ -138,6 +172,26 @@ export default function Dashboard() {
                   <td className="col-valor mono">
                     {t.tipo === 'despesa' ? '-' : '+'} {formatBRL(Number(t.valor))}
                   </td>
+                  <td className="col-valor mono">
+                    {editandoEfetivoId === t.id ? (
+                      <span className="efetivo-edit">
+                        <input
+                          className="efetivo-input"
+                          inputMode="decimal"
+                          value={efetivoInput}
+                          onChange={(e) => setEfetivoInput(e.target.value)}
+                          placeholder="0,00"
+                          autoFocus
+                        />
+                        <button className="icon-btn" onClick={() => salvarEfetivo(t)} title="Salvar">✓</button>
+                        <button className="icon-btn" onClick={() => setEditandoEfetivoId(null)} title="Cancelar">✕</button>
+                      </span>
+                    ) : (
+                      <button className="efetivo-display" onClick={() => iniciarEdicaoEfetivo(t)} title="Clique para editar o valor efetivo">
+                        {t.valor_efetivo != null ? formatBRL(Number(t.valor_efetivo)) : '—'}
+                      </button>
+                    )}
+                  </td>
                   <td className="col-pago">
                     <button
                       className={'pago-toggle' + (t.pago ? ' pago' : '')}
@@ -148,7 +202,7 @@ export default function Dashboard() {
                     </button>
                   </td>
                   <td className="col-acoes">
-                    <button className="icon-btn" onClick={() => duplicarParaProximoMes(t)} title="Duplicar para o próximo mês">⧉</button>
+                    <button className="icon-btn" onClick={() => duplicar(t)} title="Duplicar para o próximo mês">⧉</button>
                     <button className="icon-btn icon-btn-danger" onClick={() => excluir(t)} title="Excluir">✕</button>
                   </td>
                 </tr>

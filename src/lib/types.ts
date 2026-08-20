@@ -23,6 +23,7 @@ export interface Transaction {
   categoria_id: string | null
   meio_pagamento_id: string | null
   valor: number
+  valor_efetivo: number | null
   data_lancamento: string // YYYY-MM-DD
   competencia_mes: number // 1-12
   competencia_ano: number

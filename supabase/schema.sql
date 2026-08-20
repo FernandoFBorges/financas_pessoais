@@ -125,3 +125,11 @@ create index if not exists idx_transactions_grupo_parcelamento
 --   ('SEU_USER_ID_AQUI', 'Nubank Thais'),
 --   ('SEU_USER_ID_AQUI', 'Mercado Pago'),
 --   ('SEU_USER_ID_AQUI', 'Dinheiro');
+
+-- =========================================================
+-- Migração — adiciona valor efetivo (o que foi de fato pago/
+-- recebido), separado do valor previsto (campo "valor" já existente)
+-- Rode isso uma vez no SQL Editor do Supabase.
+-- =========================================================
+
+alter table transactions add column if not exists valor_efetivo numeric(12, 2);
