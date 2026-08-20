@@ -4,25 +4,16 @@ import { supabase } from '../lib/supabase'
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [modo, setModo] = useState<'entrar' | 'criar'>('entrar')
   const [erro, setErro] = useState<string | null>(null)
-  const [aviso, setAviso] = useState<string | null>(null)
   const [carregando, setCarregando] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setErro(null)
-    setAviso(null)
     setCarregando(true)
 
-    if (modo === 'entrar') {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) setErro(error.message)
-    } else {
-      const { error } = await supabase.auth.signUp({ email, password })
-      if (error) setErro(error.message)
-      else setAviso('Conta criada. Verifique seu e-mail se a confirmação estiver ativa, ou já faça login.')
-    }
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) setErro(error.message)
 
     setCarregando(false)
   }
@@ -54,7 +45,6 @@ export default function Login() {
           <input
             type="password"
             required
-            minLength={6}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
@@ -62,18 +52,9 @@ export default function Login() {
         </label>
 
         {erro && <p className="msg msg-erro">{erro}</p>}
-        {aviso && <p className="msg msg-aviso">{aviso}</p>}
 
         <button className="btn btn-primary" type="submit" disabled={carregando}>
-          {carregando ? 'Um instante…' : modo === 'entrar' ? 'Entrar' : 'Criar conta'}
-        </button>
-
-        <button
-          type="button"
-          className="link-btn"
-          onClick={() => setModo(modo === 'entrar' ? 'criar' : 'entrar')}
-        >
-          {modo === 'entrar' ? 'Ainda não tem conta? Criar uma' : 'Já tem conta? Entrar'}
+          {carregando ? 'Um instante…' : 'Entrar'}
         </button>
       </form>
     </div>
