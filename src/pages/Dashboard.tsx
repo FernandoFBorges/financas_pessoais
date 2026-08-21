@@ -1,19 +1,21 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useCompetencia } from '../context/CompetenciaContext'
 import { useLookups } from '../lib/useLookups'
-import { formatBRL, type Transaction } from '../lib/types'
+import Modal from '../components/Modal'
+import TransactionForm, { type DuplicadoPrefill } from '../components/TransactionForm'
+import TransactionColumn from '../components/TransactionColumn'
+import { formatBRL, type Tipo, type Transaction } from '../lib/types'
 
 export default function Dashboard() {
-  const navigate = useNavigate()
   const { mes, ano } = useCompetencia()
   const { categories, paymentMethods } = useLookups()
   const [items, setItems] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
-  const [filtro, setFiltro] = useState<'todos' | 'despesa' | 'receita'>('todos')
-  const [editandoEfetivoId, setEditandoEfetivoId] = useState<string | null>(null)
-  const [efetivoInput, setEfetivoInput] = useState('')
+
+  const [modalAberto, setModalAberto] = useState(false)
+  const [modalTipo, setModalTipo] = useState<Tipo>('despesa')
+  const [modalDuplicado, setModalDuplicado] = useState<DuplicadoPrefill | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -31,11 +33,6 @@ export default function Dashboard() {
     load()
   }, [load])
 
-  const nomeCategoria = (id: string | null) => categories.find((c) => c.id === id)?.nome ?? '—'
-  const nomeMeio = (id: string | null) => paymentMethods.find((p) => p.id === id)?.nome ?? '—'
-
-  // Valor efetivo "realizado": usa o valor efetivo se já foi preenchido,
-  // senão usa o previsto quando já está marcado como pago, senão é zero (ainda não realizado).
   const valorEfetivoRealizado = (t: Transaction) => {
     if (t.valor_efetivo != null) return Number(t.valor_efetivo)
     if (t.pago) return Number(t.valor)
@@ -47,51 +44,56 @@ export default function Dashboard() {
 
   const previstoReceitas = receitas.reduce((s, i) => s + Number(i.valor), 0)
   const previstoDespesas = despesas.reduce((s, i) => s + Number(i.valor), 0)
-  const saldoPrevisto = previstoReceitas - previstoDespesas
-
   const efetivoReceitas = receitas.reduce((s, i) => s + valorEfetivoRealizado(i), 0)
   const efetivoDespesas = despesas.reduce((s, i) => s + valorEfetivoRealizado(i), 0)
   const saldoEfetivo = efetivoReceitas - efetivoDespesas
+  const saldoPrevisto = previstoReceitas - previstoDespesas
 
-  const visiveis = items.filter((i) => filtro === 'todos' || i.tipo === filtro)
+  function abrirNovo(tipo: Tipo) {
+    setModalTipo(tipo)
+    setModalDuplicado(null)
+    setModalAberto(true)
+  }
 
-  function duplicar(t: Transaction) {
+  function abrirDuplicar(t: Transaction) {
     const novoMes = t.competencia_mes === 12 ? 1 : t.competencia_mes + 1
     const novoAno = t.competencia_mes === 12 ? t.competencia_ano + 1 : t.competencia_ano
-
-    navigate('/nova', {
-      state: {
-        duplicado: true,
-        tipo: t.tipo,
-        descricao: t.descricao,
-        categoria_id: t.categoria_id,
-        meio_pagamento_id: t.meio_pagamento_id,
-        valor: Number(t.valor),
-        competencia_mes: novoMes,
-        competencia_ano: novoAno,
-        observacao: t.observacao,
-      },
+    setModalTipo(t.tipo)
+    setModalDuplicado({
+      tipo: t.tipo,
+      descricao: t.descricao,
+      categoria_id: t.categoria_id,
+      meio_pagamento_id: t.meio_pagamento_id,
+      valor: Number(t.valor),
+      competencia_mes: novoMes,
+      competencia_ano: novoAno,
+      observacao: t.observacao,
     })
+    setModalAberto(true)
+  }
+
+  function fecharModal() {
+    setModalAberto(false)
+    setModalDuplicado(null)
+  }
+
+  function onSalvo() {
+    fecharModal()
+    load()
   }
 
   async function togglePago(t: Transaction) {
     const novoPago = !t.pago
-    // Ao marcar como pago, se ainda não tem valor efetivo definido, usa o previsto como sugestão inicial.
-    const patch: Partial<Transaction> =
-      novoPago && t.valor_efetivo == null ? { pago: novoPago, valor_efetivo: t.valor } : { pago: novoPago }
+    const patch =
+      novoPago && t.valor_efetivo == null
+        ? { pago: novoPago, valor_efetivo: t.valor }
+        : { pago: novoPago }
     await supabase.from('transactions').update(patch).eq('id', t.id)
     load()
   }
 
-  function iniciarEdicaoEfetivo(t: Transaction) {
-    setEditandoEfetivoId(t.id)
-    setEfetivoInput(t.valor_efetivo != null ? String(t.valor_efetivo) : '')
-  }
-
-  async function salvarEfetivo(t: Transaction) {
-    const valor = efetivoInput.trim() === '' ? null : Number(efetivoInput.replace(',', '.'))
+  async function salvarEfetivo(t: Transaction, valor: number | null) {
     await supabase.from('transactions').update({ valor_efetivo: valor }).eq('id', t.id)
-    setEditandoEfetivoId(null)
     load()
   }
 
@@ -112,105 +114,60 @@ export default function Dashboard() {
     <div>
       <div className="totals-row">
         <div className="ledger-card total-card total-receita">
-          <span className="total-label">Receitas — previsto</span>
-          <span className="total-value">{formatBRL(previstoReceitas)}</span>
-          <span className="total-sub">Efetivo: {formatBRL(efetivoReceitas)}</span>
+          <span className="total-label">Receitas — efetivo</span>
+          <span className="total-value">{formatBRL(efetivoReceitas)}</span>
+          <span className="total-sub">Previsto: {formatBRL(previstoReceitas)}</span>
         </div>
         <div className="ledger-card total-card total-despesa">
-          <span className="total-label">Despesas — previsto</span>
-          <span className="total-value">{formatBRL(previstoDespesas)}</span>
-          <span className="total-sub">Efetivo: {formatBRL(efetivoDespesas)}</span>
+          <span className="total-label">Despesas — efetivo</span>
+          <span className="total-value">{formatBRL(efetivoDespesas)}</span>
+          <span className="total-sub">Previsto: {formatBRL(previstoDespesas)}</span>
         </div>
-        <div className={'stamp ' + (saldoPrevisto >= 0 ? 'stamp-positivo' : 'stamp-negativo')}>
-          <span className="stamp-title">{saldoPrevisto >= 0 ? 'SALDO PREVISTO +' : 'SALDO PREVISTO -'}</span>
-          <span className="stamp-value">{formatBRL(saldoPrevisto)}</span>
-          <span className="stamp-sub">Efetivo até agora: {formatBRL(saldoEfetivo)}</span>
+        <div className={'stamp ' + (saldoEfetivo >= 0 ? 'stamp-positivo' : 'stamp-negativo')}>
+          <span className="stamp-title">{saldoEfetivo >= 0 ? 'SALDO EFETIVO +' : 'SALDO EFETIVO -'}</span>
+          <span className="stamp-value">{formatBRL(saldoEfetivo)}</span>
+          <span className="stamp-sub">Previsto: {formatBRL(saldoPrevisto)}</span>
         </div>
       </div>
 
-      <div className="list-toolbar">
-        <div className="filter-tabs">
-          <button className={filtro === 'todos' ? 'chip active' : 'chip'} onClick={() => setFiltro('todos')}>Todos</button>
-          <button className={filtro === 'receita' ? 'chip active' : 'chip'} onClick={() => setFiltro('receita')}>Receitas</button>
-          <button className={filtro === 'despesa' ? 'chip active' : 'chip'} onClick={() => setFiltro('despesa')}>Despesas</button>
+      {loading ? (
+        <p className="empty-state">Carregando…</p>
+      ) : (
+        <div className="columns-grid">
+          <TransactionColumn
+            tipo="despesa"
+            titulo="Despesas"
+            items={despesas}
+            categories={categories}
+            paymentMethods={paymentMethods}
+            onNovo={() => abrirNovo('despesa')}
+            onDuplicar={abrirDuplicar}
+            onTogglePago={togglePago}
+            onSalvarEfetivo={salvarEfetivo}
+            onExcluir={excluir}
+          />
+          <TransactionColumn
+            tipo="receita"
+            titulo="Receitas"
+            items={receitas}
+            categories={categories}
+            paymentMethods={paymentMethods}
+            onNovo={() => abrirNovo('receita')}
+            onDuplicar={abrirDuplicar}
+            onTogglePago={togglePago}
+            onSalvarEfetivo={salvarEfetivo}
+            onExcluir={excluir}
+          />
         </div>
-        <Link to="/nova" className="btn btn-primary">+ Novo lançamento</Link>
-      </div>
+      )}
 
-      <div className="ledger-card">
-        {loading ? (
-          <p className="empty-state">Carregando…</p>
-        ) : visiveis.length === 0 ? (
-          <p className="empty-state">Nada lançado nessa competência ainda. Comece pelo botão acima.</p>
-        ) : (
-          <table className="ledger-table">
-            <thead>
-              <tr>
-                <th>Descrição</th>
-                <th>Categoria</th>
-                <th>Meio</th>
-                <th>Lançado em</th>
-                <th className="col-valor">Previsto</th>
-                <th className="col-valor">Efetivo</th>
-                <th className="col-pago">Pago</th>
-                <th className="col-acoes"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {visiveis.map((t) => (
-                <tr key={t.id} className={t.tipo === 'receita' ? 'row-receita' : 'row-despesa'}>
-                  <td>
-                    {t.descricao}
-                    {t.parcela_atual && t.parcela_total && (
-                      <span className="badge-parcela">{t.parcela_atual}/{t.parcela_total}</span>
-                    )}
-                    {t.recorrente && <span className="badge-recorrente">recorrente</span>}
-                  </td>
-                  <td>{nomeCategoria(t.categoria_id)}</td>
-                  <td>{nomeMeio(t.meio_pagamento_id)}</td>
-                  <td>{new Date(t.data_lancamento + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
-                  <td className="col-valor mono">
-                    {t.tipo === 'despesa' ? '-' : '+'} {formatBRL(Number(t.valor))}
-                  </td>
-                  <td className="col-valor mono">
-                    {editandoEfetivoId === t.id ? (
-                      <span className="efetivo-edit">
-                        <input
-                          className="efetivo-input"
-                          inputMode="decimal"
-                          value={efetivoInput}
-                          onChange={(e) => setEfetivoInput(e.target.value)}
-                          placeholder="0,00"
-                          autoFocus
-                        />
-                        <button className="icon-btn" onClick={() => salvarEfetivo(t)} title="Salvar">✓</button>
-                        <button className="icon-btn" onClick={() => setEditandoEfetivoId(null)} title="Cancelar">✕</button>
-                      </span>
-                    ) : (
-                      <button className="efetivo-display" onClick={() => iniciarEdicaoEfetivo(t)} title="Clique para editar o valor efetivo">
-                        {t.valor_efetivo != null ? formatBRL(Number(t.valor_efetivo)) : '—'}
-                      </button>
-                    )}
-                  </td>
-                  <td className="col-pago">
-                    <button
-                      className={'pago-toggle' + (t.pago ? ' pago' : '')}
-                      onClick={() => togglePago(t)}
-                      title={t.pago ? 'Marcar como pendente' : 'Marcar como pago'}
-                    >
-                      {t.pago ? '✓' : '·'}
-                    </button>
-                  </td>
-                  <td className="col-acoes">
-                    <button className="icon-btn" onClick={() => duplicar(t)} title="Duplicar para o próximo mês">⧉</button>
-                    <button className="icon-btn icon-btn-danger" onClick={() => excluir(t)} title="Excluir">✕</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <Modal
+        open={modalAberto}
+        onClose={fecharModal}
+        title={modalDuplicado ? 'Duplicar lançamento' : modalTipo === 'despesa' ? 'Nova despesa' : 'Nova receita'}
+      >
+        <TransactionForm tipoInicial={modalTipo} duplicado={modalDuplicado} onSaved={onSalvo} onCancel={fecharModal} />
+      </Modal>
     </div>
   )
 }

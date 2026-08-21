@@ -4,7 +4,6 @@ import { CompetenciaProvider } from './context/CompetenciaContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
-import NovaTransacao from './pages/NovaTransacao'
 import Parcelamento from './pages/Parcelamento'
 import Configuracoes from './pages/Configuracoes'
 
@@ -24,7 +23,6 @@ function PrivateArea() {
       <Layout>
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/nova" element={<NovaTransacao />} />
           <Route path="/parcelamento" element={<Parcelamento />} />
           <Route path="/config" element={<Configuracoes />} />
           <Route path="*" element={<Navigate to="/" replace />} />
