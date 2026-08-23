@@ -960,3 +960,183 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- Dashboard summary bar (saldo inicial / receitas / despesas / saldo atual) ---------- */
+
+.dashboard-bar {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 14px;
+  margin-bottom: 20px;
+  align-items: stretch;
+}
+
+.dash-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: center;
+  padding: 16px 18px;
+}
+
+.dash-card .total-value {
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.dash-receita { color: var(--color-receita); }
+.dash-despesa { color: var(--color-despesa); }
+
+@media (max-width: 900px) {
+  .dashboard-bar {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ---------- Column toolbar (only grouping select now — filters moved to headers) ---------- */
+
+.column-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.column-toolbar select {
+  border: 1px solid var(--color-rule);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12.5px;
+  background: #fff;
+  color: var(--color-ink);
+}
+
+/* ---------- Column header filter popover ---------- */
+
+.grid-th-label {
+  cursor: pointer;
+}
+
+.th-filter-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.th-filter-btn {
+  background: none;
+  border: none;
+  color: var(--color-ink-soft);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 2px 3px;
+}
+
+.th-filter-btn.active {
+  color: var(--color-gold);
+  font-weight: 700;
+}
+
+.th-filter-popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 45;
+  background: #fff;
+  border: 1px solid var(--color-rule);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: 6px;
+  min-width: 160px;
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+}
+
+.th-filter-option {
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 5px;
+  font-size: 12.5px;
+  color: var(--color-ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.th-filter-option:hover {
+  background: var(--color-paper-2);
+}
+
+.th-filter-option.active {
+  background: var(--color-cover);
+  color: #f6f1e4;
+}
+
+.th-filter-active {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-gold);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+/* ---------- Responsive grid: table becomes stacked cards on narrow screens ---------- */
+
+@media (max-width: 700px) {
+  .grid-scroll {
+    overflow-x: visible;
+  }
+
+  .grid-table thead {
+    display: none;
+  }
+
+  .grid-table, .grid-table tbody, .grid-table tr {
+    display: block;
+    width: 100%;
+  }
+
+  .grid-table tr:not(.group-row) {
+    border: 1px solid var(--color-rule);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+  }
+
+  .grid-table td {
+    display: block;
+    border: none !important;
+    padding: 3px 0 !important;
+    text-align: left !important;
+  }
+
+  .grid-table td[data-label]::before {
+    content: attr(data-label) ": ";
+    font-weight: 600;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--color-ink-soft);
+  }
+
+  .grid-table td.col-pago,
+  .grid-table td.col-acoes {
+    display: inline-block;
+    margin-right: 14px;
+  }
+
+  .group-row td {
+    padding: 10px 0 4px !important;
+  }
+}

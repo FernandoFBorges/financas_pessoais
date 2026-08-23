@@ -5,13 +5,22 @@ import { useLookups } from '../lib/useLookups'
 import Modal from '../components/Modal'
 import TransactionForm, { type PrefillData } from '../components/TransactionForm'
 import TransactionColumn from '../components/TransactionColumn'
-import type { Tipo, Transaction } from '../lib/types'
+import { formatBRL, type Tipo, type Transaction } from '../lib/types'
+
+function valorEfetivoRealizado(t: { valor: number; valor_efetivo: number | null; pago: boolean }) {
+  if (t.valor_efetivo != null) return Number(t.valor_efetivo)
+  if (t.pago) return Number(t.valor)
+  return 0
+}
 
 export default function Dashboard() {
   const { mes, ano } = useCompetencia()
   const { categories, paymentMethods } = useLookups()
   const [items, setItems] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
+
+  const [saldoInicialGeral, setSaldoInicialGeral] = useState(0)
+  const [acumuladoAnterior, setAcumuladoAnterior] = useState(0)
 
   const [modalAberto, setModalAberto] = useState(false)
   const [modalTipo, setModalTipo] = useState<Tipo>('despesa')
@@ -34,8 +43,42 @@ export default function Dashboard() {
     load()
   }, [load])
 
+  // Saldo inicial cadastrado em Parâmetros (uma vez só, não depende do mês)
+  useEffect(() => {
+    async function carregarSaldoInicial() {
+      const { data } = await supabase.from('user_settings').select('saldo_inicial').maybeSingle()
+      setSaldoInicialGeral(data?.saldo_inicial != null ? Number(data.saldo_inicial) : 0)
+    }
+    carregarSaldoInicial()
+  }, [])
+
+  // Soma efetiva (receita - despesa) de todas as competências ANTERIORES à selecionada,
+  // pra saber quanto já tinha acumulado ao entrar no mês atual.
+  useEffect(() => {
+    async function carregarAcumulado() {
+      const { data } = await supabase
+        .from('transactions')
+        .select('tipo, valor, valor_efetivo, pago')
+        .or(`competencia_ano.lt.${ano},and(competencia_ano.eq.${ano},competencia_mes.lt.${mes})`)
+
+      const linhas = (data ?? []) as { tipo: string; valor: number; valor_efetivo: number | null; pago: boolean }[]
+      const soma = linhas.reduce((acc, t) => {
+        const efetivo = valorEfetivoRealizado(t)
+        return acc + (t.tipo === 'receita' ? efetivo : -efetivo)
+      }, 0)
+      setAcumuladoAnterior(soma)
+    }
+    carregarAcumulado()
+  }, [mes, ano])
+
   const receitas = items.filter((i) => i.tipo === 'receita')
   const despesas = items.filter((i) => i.tipo === 'despesa')
+
+  const efetivoReceitas = receitas.reduce((s, i) => s + valorEfetivoRealizado(i), 0)
+  const efetivoDespesas = despesas.reduce((s, i) => s + valorEfetivoRealizado(i), 0)
+
+  const saldoInicialDoMes = saldoInicialGeral + acumuladoAnterior
+  const saldoAtual = saldoInicialDoMes + efetivoReceitas - efetivoDespesas
 
   function abrirNovo() {
     setModalTipo('despesa')
@@ -116,6 +159,25 @@ export default function Dashboard() {
 
   return (
     <div>
+      <div className="dashboard-bar">
+        <div className="ledger-card dash-card">
+          <span className="total-label">Saldo inicial do mês</span>
+          <span className="total-value mono">{formatBRL(saldoInicialDoMes)}</span>
+        </div>
+        <div className="ledger-card dash-card">
+          <span className="total-label">Receitas</span>
+          <span className="total-value mono dash-receita">{formatBRL(efetivoReceitas)}</span>
+        </div>
+        <div className="ledger-card dash-card">
+          <span className="total-label">Despesas</span>
+          <span className="total-value mono dash-despesa">{formatBRL(efetivoDespesas)}</span>
+        </div>
+        <div className={'stamp ' + (saldoAtual >= 0 ? 'stamp-positivo' : 'stamp-negativo')}>
+          <span className="stamp-title">SALDO ATUAL</span>
+          <span className="stamp-value">{formatBRL(saldoAtual)}</span>
+        </div>
+      </div>
+
       <div className="page-toolbar">
         <button className="btn btn-primary" onClick={abrirNovo}>+ Novo lançamento</button>
       </div>

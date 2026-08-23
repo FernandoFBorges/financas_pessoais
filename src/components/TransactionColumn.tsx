@@ -1,10 +1,11 @@
-import { Fragment, useMemo, useState, type DragEvent } from 'react'
+import { Fragment, useMemo, useState, type DragEvent, type MouseEvent } from 'react'
 import { formatBRL, type Category, type PaymentMethod, type Tipo, type Transaction } from '../lib/types'
 
 type Agrupamento = 'nenhum' | 'categoria' | 'meio' | 'pago'
 type FiltroPago = 'todos' | 'pago' | 'pendente'
 type ColKey = 'descricao' | 'categoria' | 'meio' | 'data' | 'previsto' | 'efetivo'
 type SortDir = 'asc' | 'desc'
+type FiltroPopoverKey = 'categoria' | 'meio' | 'pago' | null
 
 const COLUMN_LABELS: Record<ColKey, string> = {
   descricao: 'Descrição',
@@ -50,6 +51,7 @@ export default function TransactionColumn({
   const [sortKey, setSortKey] = useState<ColKey | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [arrastando, setArrastando] = useState<ColKey | null>(null)
+  const [filtroPopoverAberto, setFiltroPopoverAberto] = useState<FiltroPopoverKey>(null)
 
   const categoriasDoTipo = categories.filter((c) => c.tipo === tipo)
   const nomeCategoria = (id: string | null) => categories.find((c) => c.id === id)?.nome ?? '—'
@@ -164,6 +166,11 @@ export default function TransactionColumn({
     setArrastando(null)
   }
 
+  function abrirFecharPopover(key: FiltroPopoverKey, e: MouseEvent) {
+    e.stopPropagation()
+    setFiltroPopoverAberto((atual) => (atual === key ? null : key))
+  }
+
   function renderValorCelula(t: Transaction, key: 'previsto' | 'efetivo') {
     if (key === 'previsto') {
       return <span className="mono">{formatBRL(Number(t.valor))}</span>
@@ -209,12 +216,12 @@ export default function TransactionColumn({
     }
   }
 
-  function excluirComConfirmacao(t: Transaction) {
-    onExcluir(t)
-  }
+  const nomeFiltroCategoriaAtivo = filtroCategoria ? nomeCategoria(filtroCategoria) : null
+  const nomeFiltroMeioAtivo = filtroMeio ? nomeMeio(filtroMeio) : null
+  const nomeFiltroPagoAtivo = filtroPago !== 'todos' ? (filtroPago === 'pago' ? 'Pago' : 'Pendente') : null
 
   return (
-    <div className={'ledger-card column-card column-' + tipo}>
+    <div className={'ledger-card column-card column-' + tipo} onClick={() => setFiltroPopoverAberto(null)}>
       <h2 className="form-title">{titulo}</h2>
 
       <div className="column-total-bar">
@@ -222,24 +229,7 @@ export default function TransactionColumn({
         <span className="column-total-previsto">previsto {formatBRL(totalPrevisto)}</span>
       </div>
 
-      <div className="column-filters">
-        <select value={filtroCategoria} onChange={(e) => setFiltroCategoria(e.target.value)}>
-          <option value="">Todas categorias</option>
-          {categoriasDoTipo.map((c) => (
-            <option key={c.id} value={c.id}>{c.nome}</option>
-          ))}
-        </select>
-        <select value={filtroMeio} onChange={(e) => setFiltroMeio(e.target.value)}>
-          <option value="">Todos meios</option>
-          {paymentMethods.map((p) => (
-            <option key={p.id} value={p.id}>{p.nome}</option>
-          ))}
-        </select>
-        <select value={filtroPago} onChange={(e) => setFiltroPago(e.target.value as FiltroPago)}>
-          <option value="todos">Pago e pendente</option>
-          <option value="pago">Só pagos</option>
-          <option value="pendente">Só pendentes</option>
-        </select>
+      <div className="column-toolbar">
         <select value={agrupamento} onChange={(e) => setAgrupamento(e.target.value as Agrupamento)}>
           <option value="nenhum">Sem agrupamento</option>
           <option value="categoria">Agrupar por categoria</option>
@@ -262,18 +252,92 @@ export default function TransactionColumn({
                     onDragStart={(e) => onDragStart(e, key)}
                     onDragOver={onDragOver}
                     onDrop={(e) => onDrop(e, key)}
-                    onClick={() => alternarOrdenacao(key)}
                     className={'grid-th' + (key === 'previsto' || key === 'efetivo' ? ' col-valor' : '')}
-                    title="Clique pra ordenar · arraste pra reordenar"
                   >
                     <span className="grid-th-inner">
                       <span className="drag-grip">⠿</span>
-                      {COLUMN_LABELS[key]}
-                      {sortKey === key && <span className="sort-arrow">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+                      <span onClick={() => alternarOrdenacao(key)} className="grid-th-label">
+                        {COLUMN_LABELS[key]}
+                        {sortKey === key && <span className="sort-arrow">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+                      </span>
+                      {(key === 'categoria' || key === 'meio') && (
+                        <span className="th-filter-wrap">
+                          <button
+                            className={'th-filter-btn' + ((key === 'categoria' ? nomeFiltroCategoriaAtivo : nomeFiltroMeioAtivo) ? ' active' : '')}
+                            onClick={(e) => abrirFecharPopover(key, e)}
+                            title="Filtrar"
+                          >
+                            ▾
+                          </button>
+                          {filtroPopoverAberto === key && (
+                            <div className="th-filter-popover" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                className={'th-filter-option' + (key === 'categoria' ? (!filtroCategoria ? ' active' : '') : (!filtroMeio ? ' active' : ''))}
+                                onClick={() => {
+                                  if (key === 'categoria') setFiltroCategoria('')
+                                  else setFiltroMeio('')
+                                  setFiltroPopoverAberto(null)
+                                }}
+                              >
+                                {key === 'categoria' ? 'Todas categorias' : 'Todos os meios'}
+                              </button>
+                              {(key === 'categoria' ? categoriasDoTipo : paymentMethods).map((opt) => (
+                                <button
+                                  key={opt.id}
+                                  className={
+                                    'th-filter-option' +
+                                    ((key === 'categoria' ? filtroCategoria === opt.id : filtroMeio === opt.id) ? ' active' : '')
+                                  }
+                                  onClick={() => {
+                                    if (key === 'categoria') setFiltroCategoria(opt.id)
+                                    else setFiltroMeio(opt.id)
+                                    setFiltroPopoverAberto(null)
+                                  }}
+                                >
+                                  {opt.nome}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </span>
+                      )}
                     </span>
+                    {key === 'categoria' && nomeFiltroCategoriaAtivo && (
+                      <span className="th-filter-active">{nomeFiltroCategoriaAtivo}</span>
+                    )}
+                    {key === 'meio' && nomeFiltroMeioAtivo && (
+                      <span className="th-filter-active">{nomeFiltroMeioAtivo}</span>
+                    )}
                   </th>
                 ))}
-                <th className="col-pago">Pago</th>
+                <th className="col-pago">
+                  <span className="grid-th-inner">
+                    Pago
+                    <span className="th-filter-wrap">
+                      <button
+                        className={'th-filter-btn' + (nomeFiltroPagoAtivo ? ' active' : '')}
+                        onClick={(e) => abrirFecharPopover('pago', e)}
+                        title="Filtrar"
+                      >
+                        ▾
+                      </button>
+                      {filtroPopoverAberto === 'pago' && (
+                        <div className="th-filter-popover" onClick={(e) => e.stopPropagation()}>
+                          <button className={'th-filter-option' + (filtroPago === 'todos' ? ' active' : '')} onClick={() => { setFiltroPago('todos'); setFiltroPopoverAberto(null) }}>
+                            Pago e pendente
+                          </button>
+                          <button className={'th-filter-option' + (filtroPago === 'pago' ? ' active' : '')} onClick={() => { setFiltroPago('pago'); setFiltroPopoverAberto(null) }}>
+                            Só pagos
+                          </button>
+                          <button className={'th-filter-option' + (filtroPago === 'pendente' ? ' active' : '')} onClick={() => { setFiltroPago('pendente'); setFiltroPopoverAberto(null) }}>
+                            Só pendentes
+                          </button>
+                        </div>
+                      )}
+                    </span>
+                  </span>
+                  {nomeFiltroPagoAtivo && <span className="th-filter-active">{nomeFiltroPagoAtivo}</span>}
+                </th>
                 <th className="col-acoes"></th>
               </tr>
             </thead>
@@ -281,7 +345,7 @@ export default function TransactionColumn({
               {grupos.map((g) => (
                 <Fragment key={g.chave}>
                   {agrupamento !== 'nenhum' && (
-                    <tr key={g.chave + '-header'} className="group-row">
+                    <tr className="group-row">
                       <td colSpan={colOrder.length + 2}>
                         <span className="group-row-inner">
                           <span>{g.label}</span>
@@ -298,11 +362,11 @@ export default function TransactionColumn({
                   {g.itens.map((t) => (
                     <tr key={t.id} className={t.tipo === 'receita' ? 'row-receita' : 'row-despesa'}>
                       {colOrder.map((key) => (
-                        <td key={key} className={key === 'previsto' || key === 'efetivo' ? 'col-valor' : ''}>
+                        <td key={key} data-label={COLUMN_LABELS[key]} className={key === 'previsto' || key === 'efetivo' ? 'col-valor' : ''}>
                           {renderCelula(t, key)}
                         </td>
                       ))}
-                      <td className="col-pago">
+                      <td className="col-pago" data-label="Pago">
                         <button
                           className={'pago-toggle' + (t.pago ? ' pago' : '')}
                           onClick={() => onTogglePago(t)}
@@ -311,10 +375,10 @@ export default function TransactionColumn({
                           {t.pago ? '✓' : '·'}
                         </button>
                       </td>
-                      <td className="col-acoes">
+                      <td className="col-acoes" data-label="Ações">
                         <button className="icon-btn" onClick={() => onEditar(t)} title="Editar">✎</button>
                         <button className="icon-btn" onClick={() => onDuplicar(t)} title="Duplicar para o próximo mês">⧉</button>
-                        <button className="icon-btn icon-btn-danger" onClick={() => excluirComConfirmacao(t)} title="Excluir">✕</button>
+                        <button className="icon-btn icon-btn-danger" onClick={() => onExcluir(t)} title="Excluir">✕</button>
                       </td>
                     </tr>
                   ))}
