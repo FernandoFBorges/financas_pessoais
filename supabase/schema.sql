@@ -133,3 +133,23 @@ create index if not exists idx_transactions_grupo_parcelamento
 -- =========================================================
 
 alter table transactions add column if not exists valor_efetivo numeric(12, 2);
+
+-- =========================================================
+-- Migração — parâmetros do usuário (saldo inicial da operação)
+-- Rode isso uma vez no SQL Editor do Supabase.
+-- =========================================================
+
+create table if not exists user_settings (
+  user_id uuid primary key references auth.users default auth.uid(),
+  saldo_inicial numeric(12, 2) not null default 0,
+  updated_at timestamptz default now()
+);
+
+alter table user_settings enable row level security;
+
+create policy "user_settings_select_own" on user_settings
+  for select using (auth.uid() = user_id);
+create policy "user_settings_insert_own" on user_settings
+  for insert with check (auth.uid() = user_id);
+create policy "user_settings_update_own" on user_settings
+  for update using (auth.uid() = user_id);

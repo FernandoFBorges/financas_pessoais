@@ -36,6 +36,12 @@ export interface Transaction {
   created_at: string
 }
 
+export interface UserSettings {
+  user_id: string
+  saldo_inicial: number
+  updated_at: string
+}
+
 export const MESES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',

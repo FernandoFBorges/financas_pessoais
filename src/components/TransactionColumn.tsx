@@ -1,8 +1,21 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState, type DragEvent } from 'react'
 import { formatBRL, type Category, type PaymentMethod, type Tipo, type Transaction } from '../lib/types'
 
 type Agrupamento = 'nenhum' | 'categoria' | 'meio' | 'pago'
 type FiltroPago = 'todos' | 'pago' | 'pendente'
+type ColKey = 'descricao' | 'categoria' | 'meio' | 'data' | 'previsto' | 'efetivo'
+type SortDir = 'asc' | 'desc'
+
+const COLUMN_LABELS: Record<ColKey, string> = {
+  descricao: 'Descrição',
+  categoria: 'Categoria',
+  meio: 'Meio de pagamento',
+  data: 'Data de lançamento',
+  previsto: 'Vlr. previsto',
+  efetivo: 'Vlr. efetivo',
+}
+
+const DEFAULT_ORDER: ColKey[] = ['descricao', 'categoria', 'meio', 'data', 'previsto', 'efetivo']
 
 interface Props {
   tipo: Tipo
@@ -10,8 +23,8 @@ interface Props {
   items: Transaction[]
   categories: Category[]
   paymentMethods: PaymentMethod[]
-  onNovo: () => void
   onDuplicar: (t: Transaction) => void
+  onEditar: (t: Transaction) => void
   onTogglePago: (t: Transaction) => void
   onSalvarEfetivo: (t: Transaction, valor: number | null) => void
   onExcluir: (t: Transaction) => void
@@ -25,7 +38,7 @@ function valorEfetivoRealizado(t: Transaction) {
 
 export default function TransactionColumn({
   tipo, titulo, items, categories, paymentMethods,
-  onNovo, onDuplicar, onTogglePago, onSalvarEfetivo, onExcluir,
+  onDuplicar, onEditar, onTogglePago, onSalvarEfetivo, onExcluir,
 }: Props) {
   const [filtroCategoria, setFiltroCategoria] = useState('')
   const [filtroMeio, setFiltroMeio] = useState('')
@@ -33,6 +46,10 @@ export default function TransactionColumn({
   const [agrupamento, setAgrupamento] = useState<Agrupamento>('nenhum')
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [efetivoInput, setEfetivoInput] = useState('')
+  const [colOrder, setColOrder] = useState<ColKey[]>(DEFAULT_ORDER)
+  const [sortKey, setSortKey] = useState<ColKey | null>(null)
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [arrastando, setArrastando] = useState<ColKey | null>(null)
 
   const categoriasDoTipo = categories.filter((c) => c.tipo === tipo)
   const nomeCategoria = (id: string | null) => categories.find((c) => c.id === id)?.nome ?? '—'
@@ -49,12 +66,36 @@ export default function TransactionColumn({
   const totalPrevisto = filtrados.reduce((s, t) => s + Number(t.valor), 0)
   const totalEfetivo = filtrados.reduce((s, t) => s + valorEfetivoRealizado(t), 0)
 
+  function campoOrdenavel(t: Transaction, key: ColKey): string | number {
+    switch (key) {
+      case 'descricao': return t.descricao.toLowerCase()
+      case 'categoria': return nomeCategoria(t.categoria_id).toLowerCase()
+      case 'meio': return nomeMeio(t.meio_pagamento_id).toLowerCase()
+      case 'data': return t.data_lancamento
+      case 'previsto': return Number(t.valor)
+      case 'efetivo': return valorEfetivoRealizado(t)
+    }
+  }
+
+  const ordenados = useMemo(() => {
+    if (!sortKey) return filtrados
+    const copia = [...filtrados]
+    copia.sort((a, b) => {
+      const va = campoOrdenavel(a, sortKey)
+      const vb = campoOrdenavel(b, sortKey)
+      const cmp = va < vb ? -1 : va > vb ? 1 : 0
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+    return copia
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtrados, sortKey, sortDir, categories, paymentMethods])
+
   const grupos = useMemo(() => {
     if (agrupamento === 'nenhum') {
-      return [{ chave: 'flat', label: '', itens: filtrados }]
+      return [{ chave: 'flat', label: '', itens: ordenados }]
     }
     const map = new Map<string, Transaction[]>()
-    for (const t of filtrados) {
+    for (const t of ordenados) {
       let chave: string
       if (agrupamento === 'categoria') chave = t.categoria_id ?? '__sem__'
       else if (agrupamento === 'meio') chave = t.meio_pagamento_id ?? '__sem__'
@@ -78,32 +119,107 @@ export default function TransactionColumn({
         return totalB - totalA
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtrados, agrupamento])
+  }, [ordenados, agrupamento])
 
-  function iniciarEdicao(t: Transaction) {
+  function iniciarEdicaoEfetivo(t: Transaction) {
     setEditandoId(t.id)
     setEfetivoInput(t.valor_efetivo != null ? String(t.valor_efetivo) : '')
   }
 
-  function confirmarEdicao(t: Transaction) {
+  function confirmarEdicaoEfetivo(t: Transaction) {
     const valor = efetivoInput.trim() === '' ? null : Number(efetivoInput.replace(',', '.'))
     onSalvarEfetivo(t, valor)
     setEditandoId(null)
   }
 
+  function alternarOrdenacao(key: ColKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(key)
+      setSortDir('asc')
+    }
+  }
+
+  function onDragStart(e: DragEvent<HTMLTableCellElement>, key: ColKey) {
+    setArrastando(key)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  function onDragOver(e: DragEvent<HTMLTableCellElement>) {
+    e.preventDefault()
+  }
+
+  function onDrop(e: DragEvent<HTMLTableCellElement>, targetKey: ColKey) {
+    e.preventDefault()
+    if (!arrastando || arrastando === targetKey) return
+    setColOrder((prev) => {
+      const next = [...prev]
+      const from = next.indexOf(arrastando)
+      const to = next.indexOf(targetKey)
+      next.splice(from, 1)
+      next.splice(to, 0, arrastando)
+      return next
+    })
+    setArrastando(null)
+  }
+
+  function renderValorCelula(t: Transaction, key: 'previsto' | 'efetivo') {
+    if (key === 'previsto') {
+      return <span className="mono">{formatBRL(Number(t.valor))}</span>
+    }
+    if (editandoId === t.id) {
+      return (
+        <span className="efetivo-edit">
+          <input
+            className="efetivo-input"
+            inputMode="decimal"
+            value={efetivoInput}
+            onChange={(e) => setEfetivoInput(e.target.value)}
+            placeholder="0,00"
+            autoFocus
+          />
+          <button className="icon-btn" onClick={() => confirmarEdicaoEfetivo(t)} title="Salvar">✓</button>
+          <button className="icon-btn" onClick={() => setEditandoId(null)} title="Cancelar">✕</button>
+        </span>
+      )
+    }
+    return (
+      <button className="tx-valor-efetivo" onClick={() => iniciarEdicaoEfetivo(t)} title="Clique para editar o valor efetivo">
+        {t.valor_efetivo != null ? formatBRL(Number(t.valor_efetivo)) : '— definir'}
+      </button>
+    )
+  }
+
+  function renderCelula(t: Transaction, key: ColKey) {
+    switch (key) {
+      case 'descricao':
+        return (
+          <span className="tx-descricao-cell">
+            {t.descricao}
+            {t.parcela_atual && t.parcela_total && <span className="badge-parcela">{t.parcela_atual}/{t.parcela_total}</span>}
+            {t.recorrente && <span className="badge-recorrente">recorrente</span>}
+          </span>
+        )
+      case 'categoria': return nomeCategoria(t.categoria_id)
+      case 'meio': return nomeMeio(t.meio_pagamento_id)
+      case 'data': return new Date(t.data_lancamento + 'T00:00:00').toLocaleDateString('pt-BR')
+      case 'previsto': return renderValorCelula(t, 'previsto')
+      case 'efetivo': return renderValorCelula(t, 'efetivo')
+    }
+  }
+
+  function excluirComConfirmacao(t: Transaction) {
+    onExcluir(t)
+  }
+
   return (
     <div className={'ledger-card column-card column-' + tipo}>
-      <div className="column-header">
-        <div>
-          <h2 className="form-title">{titulo}</h2>
-          <p className="column-summary">
-            <span className="column-summary-efetivo">{formatBRL(totalEfetivo)}</span>
-            <span className="column-summary-previsto">previsto {formatBRL(totalPrevisto)}</span>
-          </p>
-        </div>
-        <button className="btn btn-primary" onClick={onNovo}>
-          + Nova {tipo === 'despesa' ? 'despesa' : 'receita'}
-        </button>
+      <h2 className="form-title">{titulo}</h2>
+
+      <div className="column-total-bar">
+        <span className="column-total-efetivo">{formatBRL(totalEfetivo)}</span>
+        <span className="column-total-previsto">previsto {formatBRL(totalPrevisto)}</span>
       </div>
 
       <div className="column-filters">
@@ -135,78 +251,77 @@ export default function TransactionColumn({
       {filtrados.length === 0 ? (
         <p className="empty-state">Nada por aqui com esse filtro.</p>
       ) : (
-        <div className="column-groups">
-          {grupos.map((g) => (
-            <div key={g.chave} className="column-group">
-              {agrupamento !== 'nenhum' && (
-                <div className="group-header">
-                  <span>{g.label}</span>
-                  <span className="group-header-totais">
-                    <span className="mono">{formatBRL(g.itens.reduce((s, t) => s + valorEfetivoRealizado(t), 0))}</span>
-                    <span className="mono group-previsto">
-                      prev. {formatBRL(g.itens.reduce((s, t) => s + Number(t.valor), 0))}
+        <div className="grid-scroll">
+          <table className="grid-table">
+            <thead>
+              <tr>
+                {colOrder.map((key) => (
+                  <th
+                    key={key}
+                    draggable
+                    onDragStart={(e) => onDragStart(e, key)}
+                    onDragOver={onDragOver}
+                    onDrop={(e) => onDrop(e, key)}
+                    onClick={() => alternarOrdenacao(key)}
+                    className={'grid-th' + (key === 'previsto' || key === 'efetivo' ? ' col-valor' : '')}
+                    title="Clique pra ordenar · arraste pra reordenar"
+                  >
+                    <span className="grid-th-inner">
+                      <span className="drag-grip">⠿</span>
+                      {COLUMN_LABELS[key]}
+                      {sortKey === key && <span className="sort-arrow">{sortDir === 'asc' ? '▲' : '▼'}</span>}
                     </span>
-                  </span>
-                </div>
-              )}
-
-              {g.itens.map((t) => (
-                <div key={t.id} className="tx-row">
-                  <div className="tx-row-main">
-                    <span className="tx-descricao">
-                      {t.descricao}
-                      {t.parcela_atual && t.parcela_total && (
-                        <span className="badge-parcela">{t.parcela_atual}/{t.parcela_total}</span>
-                      )}
-                      {t.recorrente && <span className="badge-recorrente">recorrente</span>}
-                    </span>
-
-                    {editandoId === t.id ? (
-                      <span className="efetivo-edit">
-                        <input
-                          className="efetivo-input"
-                          inputMode="decimal"
-                          value={efetivoInput}
-                          onChange={(e) => setEfetivoInput(e.target.value)}
-                          placeholder="0,00"
-                          autoFocus
-                        />
-                        <button className="icon-btn" onClick={() => confirmarEdicao(t)} title="Salvar">✓</button>
-                        <button className="icon-btn" onClick={() => setEditandoId(null)} title="Cancelar">✕</button>
-                      </span>
-                    ) : (
-                      <button
-                        className="tx-valor-efetivo"
-                        onClick={() => iniciarEdicao(t)}
-                        title="Clique para editar o valor efetivo"
-                      >
-                        {t.valor_efetivo != null ? formatBRL(Number(t.valor_efetivo)) : '— definir'}
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="tx-row-meta">
-                    <span className="tx-meta-texto">
-                      {nomeCategoria(t.categoria_id)} · {nomeMeio(t.meio_pagamento_id)} ·{' '}
-                      {new Date(t.data_lancamento + 'T00:00:00').toLocaleDateString('pt-BR')}
-                    </span>
-                    <span className="tx-meta-acoes">
-                      <span className="tx-previsto mono">prev. {formatBRL(Number(t.valor))}</span>
-                      <button
-                        className={'pago-toggle' + (t.pago ? ' pago' : '')}
-                        onClick={() => onTogglePago(t)}
-                        title={t.pago ? 'Marcar como pendente' : 'Marcar como pago'}
-                      >
-                        {t.pago ? '✓' : '·'}
-                      </button>
-                      <button className="icon-btn" onClick={() => onDuplicar(t)} title="Duplicar para o próximo mês">⧉</button>
-                      <button className="icon-btn icon-btn-danger" onClick={() => onExcluir(t)} title="Excluir">✕</button>
-                    </span>
-                  </div>
-                </div>
+                  </th>
+                ))}
+                <th className="col-pago">Pago</th>
+                <th className="col-acoes"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {grupos.map((g) => (
+                <Fragment key={g.chave}>
+                  {agrupamento !== 'nenhum' && (
+                    <tr key={g.chave + '-header'} className="group-row">
+                      <td colSpan={colOrder.length + 2}>
+                        <span className="group-row-inner">
+                          <span>{g.label}</span>
+                          <span className="group-header-totais">
+                            <span className="mono">{formatBRL(g.itens.reduce((s, t) => s + valorEfetivoRealizado(t), 0))}</span>
+                            <span className="mono group-previsto">
+                              prev. {formatBRL(g.itens.reduce((s, t) => s + Number(t.valor), 0))}
+                            </span>
+                          </span>
+                        </span>
+                      </td>
+                    </tr>
+                  )}
+                  {g.itens.map((t) => (
+                    <tr key={t.id} className={t.tipo === 'receita' ? 'row-receita' : 'row-despesa'}>
+                      {colOrder.map((key) => (
+                        <td key={key} className={key === 'previsto' || key === 'efetivo' ? 'col-valor' : ''}>
+                          {renderCelula(t, key)}
+                        </td>
+                      ))}
+                      <td className="col-pago">
+                        <button
+                          className={'pago-toggle' + (t.pago ? ' pago' : '')}
+                          onClick={() => onTogglePago(t)}
+                          title={t.pago ? 'Marcar como pendente' : 'Marcar como pago'}
+                        >
+                          {t.pago ? '✓' : '·'}
+                        </button>
+                      </td>
+                      <td className="col-acoes">
+                        <button className="icon-btn" onClick={() => onEditar(t)} title="Editar">✎</button>
+                        <button className="icon-btn" onClick={() => onDuplicar(t)} title="Duplicar para o próximo mês">⧉</button>
+                        <button className="icon-btn icon-btn-danger" onClick={() => excluirComConfirmacao(t)} title="Excluir">✕</button>
+                      </td>
+                    </tr>
+                  ))}
+                </Fragment>
               ))}
-            </div>
-          ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

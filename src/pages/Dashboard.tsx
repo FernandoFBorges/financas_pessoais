@@ -3,9 +3,9 @@ import { supabase } from '../lib/supabase'
 import { useCompetencia } from '../context/CompetenciaContext'
 import { useLookups } from '../lib/useLookups'
 import Modal from '../components/Modal'
-import TransactionForm, { type DuplicadoPrefill } from '../components/TransactionForm'
+import TransactionForm, { type PrefillData } from '../components/TransactionForm'
 import TransactionColumn from '../components/TransactionColumn'
-import { formatBRL, type Tipo, type Transaction } from '../lib/types'
+import type { Tipo, Transaction } from '../lib/types'
 
 export default function Dashboard() {
   const { mes, ano } = useCompetencia()
@@ -15,7 +15,8 @@ export default function Dashboard() {
 
   const [modalAberto, setModalAberto] = useState(false)
   const [modalTipo, setModalTipo] = useState<Tipo>('despesa')
-  const [modalDuplicado, setModalDuplicado] = useState<DuplicadoPrefill | null>(null)
+  const [modalPrefill, setModalPrefill] = useState<PrefillData | null>(null)
+  const [modalEditando, setModalEditando] = useState<Transaction | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -33,25 +34,13 @@ export default function Dashboard() {
     load()
   }, [load])
 
-  const valorEfetivoRealizado = (t: Transaction) => {
-    if (t.valor_efetivo != null) return Number(t.valor_efetivo)
-    if (t.pago) return Number(t.valor)
-    return 0
-  }
-
   const receitas = items.filter((i) => i.tipo === 'receita')
   const despesas = items.filter((i) => i.tipo === 'despesa')
 
-  const previstoReceitas = receitas.reduce((s, i) => s + Number(i.valor), 0)
-  const previstoDespesas = despesas.reduce((s, i) => s + Number(i.valor), 0)
-  const efetivoReceitas = receitas.reduce((s, i) => s + valorEfetivoRealizado(i), 0)
-  const efetivoDespesas = despesas.reduce((s, i) => s + valorEfetivoRealizado(i), 0)
-  const saldoEfetivo = efetivoReceitas - efetivoDespesas
-  const saldoPrevisto = previstoReceitas - previstoDespesas
-
-  function abrirNovo(tipo: Tipo) {
-    setModalTipo(tipo)
-    setModalDuplicado(null)
+  function abrirNovo() {
+    setModalTipo('despesa')
+    setModalPrefill(null)
+    setModalEditando(null)
     setModalAberto(true)
   }
 
@@ -59,7 +48,8 @@ export default function Dashboard() {
     const novoMes = t.competencia_mes === 12 ? 1 : t.competencia_mes + 1
     const novoAno = t.competencia_mes === 12 ? t.competencia_ano + 1 : t.competencia_ano
     setModalTipo(t.tipo)
-    setModalDuplicado({
+    setModalEditando(null)
+    setModalPrefill({
       tipo: t.tipo,
       descricao: t.descricao,
       categoria_id: t.categoria_id,
@@ -72,9 +62,17 @@ export default function Dashboard() {
     setModalAberto(true)
   }
 
+  function abrirEditar(t: Transaction) {
+    setModalTipo(t.tipo)
+    setModalPrefill(null)
+    setModalEditando(t)
+    setModalAberto(true)
+  }
+
   function fecharModal() {
     setModalAberto(false)
-    setModalDuplicado(null)
+    setModalPrefill(null)
+    setModalEditando(null)
   }
 
   function onSalvo() {
@@ -110,24 +108,16 @@ export default function Dashboard() {
     load()
   }
 
+  const modalTitulo = modalEditando
+    ? 'Editar lançamento'
+    : modalPrefill
+    ? 'Duplicar lançamento'
+    : 'Novo lançamento'
+
   return (
     <div>
-      <div className="totals-row">
-        <div className="ledger-card total-card total-receita">
-          <span className="total-label">Receitas — efetivo</span>
-          <span className="total-value">{formatBRL(efetivoReceitas)}</span>
-          <span className="total-sub">Previsto: {formatBRL(previstoReceitas)}</span>
-        </div>
-        <div className="ledger-card total-card total-despesa">
-          <span className="total-label">Despesas — efetivo</span>
-          <span className="total-value">{formatBRL(efetivoDespesas)}</span>
-          <span className="total-sub">Previsto: {formatBRL(previstoDespesas)}</span>
-        </div>
-        <div className={'stamp ' + (saldoEfetivo >= 0 ? 'stamp-positivo' : 'stamp-negativo')}>
-          <span className="stamp-title">{saldoEfetivo >= 0 ? 'SALDO EFETIVO +' : 'SALDO EFETIVO -'}</span>
-          <span className="stamp-value">{formatBRL(saldoEfetivo)}</span>
-          <span className="stamp-sub">Previsto: {formatBRL(saldoPrevisto)}</span>
-        </div>
+      <div className="page-toolbar">
+        <button className="btn btn-primary" onClick={abrirNovo}>+ Novo lançamento</button>
       </div>
 
       {loading ? (
@@ -140,8 +130,8 @@ export default function Dashboard() {
             items={despesas}
             categories={categories}
             paymentMethods={paymentMethods}
-            onNovo={() => abrirNovo('despesa')}
             onDuplicar={abrirDuplicar}
+            onEditar={abrirEditar}
             onTogglePago={togglePago}
             onSalvarEfetivo={salvarEfetivo}
             onExcluir={excluir}
@@ -152,8 +142,8 @@ export default function Dashboard() {
             items={receitas}
             categories={categories}
             paymentMethods={paymentMethods}
-            onNovo={() => abrirNovo('receita')}
             onDuplicar={abrirDuplicar}
+            onEditar={abrirEditar}
             onTogglePago={togglePago}
             onSalvarEfetivo={salvarEfetivo}
             onExcluir={excluir}
@@ -161,12 +151,14 @@ export default function Dashboard() {
         </div>
       )}
 
-      <Modal
-        open={modalAberto}
-        onClose={fecharModal}
-        title={modalDuplicado ? 'Duplicar lançamento' : modalTipo === 'despesa' ? 'Nova despesa' : 'Nova receita'}
-      >
-        <TransactionForm tipoInicial={modalTipo} duplicado={modalDuplicado} onSaved={onSalvo} onCancel={fecharModal} />
+      <Modal open={modalAberto} onClose={fecharModal} title={modalTitulo}>
+        <TransactionForm
+          tipoInicial={modalTipo}
+          prefill={modalPrefill}
+          editando={modalEditando}
+          onSaved={onSalvo}
+          onCancel={fecharModal}
+        />
       </Modal>
     </div>
   )

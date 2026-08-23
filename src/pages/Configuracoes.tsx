@@ -39,8 +39,11 @@ export default function Configuracoes() {
 
   const [catsSelecionadas, setCatsSelecionadas] = useState<Set<string>>(new Set())
   const [meiosSelecionados, setMeiosSelecionados] = useState<Set<string>>(new Set())
+  const [filtroTipoCat, setFiltroTipoCat] = useState<'todas' | Tipo>('todas')
 
   const [aviso, setAviso] = useState<string | null>(null)
+
+  const categoriasVisiveis = categories.filter((c) => filtroTipoCat === 'todas' || c.tipo === filtroTipoCat)
 
   // ---------- Categorias: criar ----------
   async function addCategoria(e: FormEvent) {
@@ -202,11 +205,17 @@ export default function Configuracoes() {
             <button className="btn btn-primary" type="submit">Adicionar</button>
           </form>
 
+          <div className="filter-tabs" style={{ marginBottom: 12 }}>
+            <button className={filtroTipoCat === 'todas' ? 'chip active' : 'chip'} onClick={() => setFiltroTipoCat('todas')}>Todas</button>
+            <button className={filtroTipoCat === 'despesa' ? 'chip active chip-despesa' : 'chip'} onClick={() => setFiltroTipoCat('despesa')}>Despesas</button>
+            <button className={filtroTipoCat === 'receita' ? 'chip active chip-receita' : 'chip'} onClick={() => setFiltroTipoCat('receita')}>Receitas</button>
+          </div>
+
           {loading ? (
             <p className="empty-state">Carregando…</p>
           ) : (
             <ul className="simple-list">
-              {categories.map((c) => (
+              {categoriasVisiveis.map((c) => (
                 <li key={c.id}>
                   {editandoCatId === c.id ? (
                     <>
@@ -238,7 +247,7 @@ export default function Configuracoes() {
                   )}
                 </li>
               ))}
-              {categories.length === 0 && <p className="empty-state">Nenhuma categoria ainda.</p>}
+              {categoriasVisiveis.length === 0 && <p className="empty-state">Nenhuma categoria com esse filtro.</p>}
             </ul>
           )}
         </div>

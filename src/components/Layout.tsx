@@ -20,11 +20,11 @@ export default function Layout({ children }: { children: ReactNode }) {
           <NavLink to="/" end className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
             Lançamentos
           </NavLink>
-          <NavLink to="/parcelamento" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-            Parcelamento
-          </NavLink>
           <NavLink to="/config" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
             Categorias &amp; meios
+          </NavLink>
+          <NavLink to="/parametros" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+            Parâmetros
           </NavLink>
         </nav>
 

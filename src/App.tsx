@@ -4,8 +4,8 @@ import { CompetenciaProvider } from './context/CompetenciaContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
-import Parcelamento from './pages/Parcelamento'
 import Configuracoes from './pages/Configuracoes'
+import Parametros from './pages/Parametros'
 
 function PrivateArea() {
   const { session, loading } = useAuth()
@@ -23,8 +23,8 @@ function PrivateArea() {
       <Layout>
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/parcelamento" element={<Parcelamento />} />
           <Route path="/config" element={<Configuracoes />} />
+          <Route path="/parametros" element={<Parametros />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
