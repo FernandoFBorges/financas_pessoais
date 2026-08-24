@@ -47,7 +47,9 @@ export default function TransactionColumn({
   const [agrupamento, setAgrupamento] = useState<Agrupamento>('nenhum')
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [efetivoInput, setEfetivoInput] = useState('')
-  const [colOrder, setColOrder] = useState<ColKey[]>(DEFAULT_ORDER)
+  const [colOrder, setColOrder] = useState<ColKey[]>(
+    tipo === 'receita' ? DEFAULT_ORDER.filter((k) => k !== 'meio') : DEFAULT_ORDER
+  )
   const [sortKey, setSortKey] = useState<ColKey | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [arrastando, setArrastando] = useState<ColKey | null>(null)

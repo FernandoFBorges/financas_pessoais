@@ -159,7 +159,7 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
         <button
           type="button"
           className={'chip' + (tipo === 'receita' ? ' active chip-receita' : '')}
-          onClick={() => { setTipo('receita'); setCategoriaId('') }}
+          onClick={() => { setTipo('receita'); setCategoriaId(''); setMeioId('') }}
         >
           Receita
         </button>
@@ -212,22 +212,24 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
       <div className="field-row">
         <label className="field">
           <span>Categoria</span>
-          <select value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)}>
+          <select required value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)}>
             <option value="">— selecione —</option>
             {categoriasFiltradas.map((c) => (
               <option key={c.id} value={c.id}>{c.nome}</option>
             ))}
           </select>
         </label>
-        <label className="field">
-          <span>Meio de pagamento</span>
-          <select value={meioId} onChange={(e) => setMeioId(e.target.value)}>
-            <option value="">— selecione —</option>
-            {paymentMethods.map((p) => (
-              <option key={p.id} value={p.id}>{p.nome}</option>
-            ))}
-          </select>
-        </label>
+        {tipo === 'despesa' && (
+          <label className="field">
+            <span>Meio de pagamento</span>
+            <select required value={meioId} onChange={(e) => setMeioId(e.target.value)}>
+              <option value="">— selecione —</option>
+              {paymentMethods.map((p) => (
+                <option key={p.id} value={p.id}>{p.nome}</option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
 
       <div className="field-row">
