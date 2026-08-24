@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { CompetenciaProvider } from './context/CompetenciaContext'
+import { ThemeProvider } from './context/ThemeContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -34,10 +35,12 @@ function PrivateArea() {
 
 export default function App() {
   return (
-    <BrowserRouter basename={import.meta.env.BASE_URL}>
-      <AuthProvider>
-        <PrivateArea />
-      </AuthProvider>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
+        <AuthProvider>
+          <PrivateArea />
+        </AuthProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   )
 }

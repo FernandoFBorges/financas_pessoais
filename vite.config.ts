@@ -19,8 +19,8 @@ export default defineConfig(({ mode }) => ({
         name: 'Livro Caixa — Controle Financeiro',
         short_name: 'Livro Caixa',
         description: 'Controle financeiro pessoal — despesas, receitas, parcelamentos e recorrências.',
-        theme_color: '#16241D',
-        background_color: '#16241D',
+        theme_color: '#7C3AED',
+        background_color: '#7C3AED',
         display: 'standalone',
         start_url: '.',
         icons: [

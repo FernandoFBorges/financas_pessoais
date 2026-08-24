@@ -1,11 +1,13 @@
 import { useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
+import { useTheme } from '../context/ThemeContext'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [erro, setErro] = useState<string | null>(null)
   const [carregando, setCarregando] = useState(false)
+  const { theme, toggleTheme } = useTheme()
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -20,10 +22,11 @@ export default function Login() {
 
   return (
     <div className="ledger-page login-page">
-      <div className="login-stamp">
-        <span className="stamp-line-1">LIVRO</span>
-        <span className="stamp-line-2">CAIXA</span>
-      </div>
+      <button className="theme-toggle-btn login-theme-toggle" onClick={toggleTheme}>
+        {theme === 'dark' ? '☀️ Tema claro' : '🌙 Tema escuro'}
+      </button>
+
+      <div className="login-stamp" />
 
       <form className="ledger-card login-card" onSubmit={handleSubmit}>
         <h1 className="login-title">Controle Financeiro</h1>
