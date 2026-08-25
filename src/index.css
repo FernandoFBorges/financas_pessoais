@@ -533,6 +533,32 @@ body {
   font-size: 19px;
 }
 
+.dash-card-sub {
+  font-size: 12px;
+  color: var(--color-ink-soft);
+  font-weight: 500;
+}
+
+.dash-card-diff {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.diff-favoravel {
+  color: var(--color-receita);
+}
+
+.diff-desfavoravel {
+  color: var(--color-despesa);
+}
+
+.dash-card-pendente {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-gold);
+  margin-top: 2px;
+}
+
 .dash-receita { color: var(--color-receita); }
 .dash-despesa { color: var(--color-despesa); }
 

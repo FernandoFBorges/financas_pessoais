@@ -21,6 +21,7 @@ export default function Dashboard() {
 
   const [saldoInicialGeral, setSaldoInicialGeral] = useState(0)
   const [acumuladoAnterior, setAcumuladoAnterior] = useState(0)
+  const [pendenteDespesasAnteriores, setPendenteDespesasAnteriores] = useState(0)
 
   const [modalAberto, setModalAberto] = useState(false)
   const [modalTipo, setModalTipo] = useState<Tipo>('despesa')
@@ -53,7 +54,8 @@ export default function Dashboard() {
   }, [])
 
   // Soma efetiva (receita - despesa) de todas as competências ANTERIORES à selecionada,
-  // pra saber quanto já tinha acumulado ao entrar no mês atual.
+  // pra saber quanto já tinha acumulado ao entrar no mês atual — e, de quebra, quanto
+  // de despesa de meses passados ainda ficou pendente (não paga).
   useEffect(() => {
     async function carregarAcumulado() {
       const { data } = await supabase
@@ -67,6 +69,11 @@ export default function Dashboard() {
         return acc + (t.tipo === 'receita' ? efetivo : -efetivo)
       }, 0)
       setAcumuladoAnterior(soma)
+
+      const pendente = linhas
+        .filter((t) => t.tipo === 'despesa' && !t.pago)
+        .reduce((acc, t) => acc + Number(t.valor), 0)
+      setPendenteDespesasAnteriores(pendente)
     }
     carregarAcumulado()
   }, [mes, ano])
@@ -74,11 +81,21 @@ export default function Dashboard() {
   const receitas = items.filter((i) => i.tipo === 'receita')
   const despesas = items.filter((i) => i.tipo === 'despesa')
 
+  const previstoReceitas = receitas.reduce((s, i) => s + Number(i.valor), 0)
+  const previstoDespesas = despesas.reduce((s, i) => s + Number(i.valor), 0)
   const efetivoReceitas = receitas.reduce((s, i) => s + valorEfetivoRealizado(i), 0)
   const efetivoDespesas = despesas.reduce((s, i) => s + valorEfetivoRealizado(i), 0)
 
+  const diferencaReceitas = efetivoReceitas - previstoReceitas
+  const diferencaDespesas = efetivoDespesas - previstoDespesas
+
   const saldoInicialDoMes = saldoInicialGeral + acumuladoAnterior
   const saldoAtual = saldoInicialDoMes + efetivoReceitas - efetivoDespesas
+
+  function formatDiff(v: number) {
+    const sinal = v > 0 ? '+' : ''
+    return sinal + formatBRL(v)
+  }
 
   function abrirNovo() {
     setModalTipo('despesa')
@@ -187,10 +204,23 @@ export default function Dashboard() {
         <div className="ledger-card dash-card">
           <span className="total-label">Receitas</span>
           <span className="total-value mono dash-receita">{formatBRL(efetivoReceitas)}</span>
+          <span className="dash-card-sub">previsto {formatBRL(previstoReceitas)}</span>
+          <span className={'dash-card-diff ' + (diferencaReceitas >= 0 ? 'diff-favoravel' : 'diff-desfavoravel')}>
+            diferença {formatDiff(diferencaReceitas)}
+          </span>
         </div>
         <div className="ledger-card dash-card">
           <span className="total-label">Despesas</span>
           <span className="total-value mono dash-despesa">{formatBRL(efetivoDespesas)}</span>
+          <span className="dash-card-sub">previsto {formatBRL(previstoDespesas)}</span>
+          <span className={'dash-card-diff ' + (diferencaDespesas <= 0 ? 'diff-favoravel' : 'diff-desfavoravel')}>
+            diferença {formatDiff(diferencaDespesas)}
+          </span>
+          {pendenteDespesasAnteriores > 0 && (
+            <span className="dash-card-pendente">
+              pendente de meses anteriores: {formatBRL(pendenteDespesasAnteriores)}
+            </span>
+          )}
         </div>
         <div className={'stamp ' + (saldoAtual >= 0 ? 'stamp-positivo' : 'stamp-negativo')}>
           <span className="stamp-title">SALDO ATUAL</span>
