@@ -134,7 +134,10 @@ export default function Dashboard() {
   }
 
   async function salvarEfetivo(t: Transaction, valor: number | null) {
-    await supabase.from('transactions').update({ valor_efetivo: valor }).eq('id', t.id)
+    // Lançar um valor efetivo já é, por si só, a confirmação do pagamento/recebimento.
+    // Limpar o valor efetivo desfaz essa confirmação.
+    const patch = valor != null ? { valor_efetivo: valor, pago: true } : { valor_efetivo: null, pago: false }
+    await supabase.from('transactions').update(patch).eq('id', t.id)
     load()
   }
 

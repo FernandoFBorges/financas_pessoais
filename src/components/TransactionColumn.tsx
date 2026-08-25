@@ -254,7 +254,11 @@ export default function TransactionColumn({
                     onDragStart={(e) => onDragStart(e, key)}
                     onDragOver={onDragOver}
                     onDrop={(e) => onDrop(e, key)}
-                    className={'grid-th' + (key === 'previsto' || key === 'efetivo' ? ' col-valor' : '')}
+                    className={
+                      'grid-th' +
+                      (key === 'previsto' || key === 'efetivo' ? ' col-valor' : '') +
+                      (key === 'meio' || key === 'data' ? ' grid-th-wrap' : '')
+                    }
                   >
                     <span className="grid-th-inner">
                       <span className="drag-grip">⠿</span>

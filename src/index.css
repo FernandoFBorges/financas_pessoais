@@ -700,6 +700,22 @@ body {
   cursor: pointer;
 }
 
+.grid-th-wrap {
+  white-space: normal;
+  vertical-align: bottom;
+}
+
+.grid-th-wrap .grid-th-inner {
+  align-items: flex-start;
+}
+
+.grid-th-wrap .grid-th-label {
+  white-space: normal;
+  display: inline-block;
+  max-width: 58px;
+  line-height: 1.2;
+}
+
 .drag-grip {
   opacity: 0.3;
   font-size: 11px;

@@ -56,7 +56,10 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
   const categoriasFiltradas = categories.filter((c) => c.tipo === tipo)
   const modoEdicao = !!editando
 
-  async function salvarUnico() {
+  async function salvarUnico(aplicarATodasAsParcelas: boolean) {
+    // Preencher o valor efetivo já é, por si só, a confirmação de pagamento/recebimento.
+    const pagoFinal = valorEfetivo.trim() !== '' ? true : pago
+
     const payload = {
       tipo,
       descricao,
@@ -67,12 +70,27 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
       data_lancamento: dataLancamento,
       competencia_mes: competenciaMes,
       competencia_ano: competenciaAno,
-      pago,
+      pago: pagoFinal,
       recorrente,
       observacao: observacao || null,
     }
 
     if (modoEdicao && editando) {
+      if (aplicarATodasAsParcelas && editando.grupo_parcelamento_id) {
+        // Campos compartilhados entre todas as parcelas do grupo — NUNCA propaga
+        // competência, data, pago ou valor efetivo, que são específicos de cada parcela.
+        const { error: erroGrupo } = await supabase
+          .from('transactions')
+          .update({
+            descricao,
+            categoria_id: categoriaId || null,
+            meio_pagamento_id: meioId || null,
+            valor: Number(valor.replace(',', '.')),
+          })
+          .eq('grupo_parcelamento_id', editando.grupo_parcelamento_id)
+
+        if (erroGrupo) return { error: erroGrupo }
+      }
       return supabase.from('transactions').update(payload).eq('id', editando.id)
     }
     return supabase.from('transactions').insert(payload)
@@ -119,16 +137,39 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
     return supabase.from('transactions').insert(registros)
   }
 
+  // Campos que fazem sentido replicar pra todas as parcelas do grupo — mudar a
+  // competência, data, pago ou efetivo de UMA parcela nunca deveria vazar pras outras.
+  function camposCompartilhaveisMudaram(): boolean {
+    if (!editando) return false
+    return (
+      descricao !== editando.descricao ||
+      (categoriaId || null) !== editando.categoria_id ||
+      (meioId || null) !== editando.meio_pagamento_id ||
+      Number(valor.replace(',', '.')) !== Number(editando.valor)
+    )
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setErro(null)
 
+    let aplicarATodasAsParcelas = false
+
     if (modoEdicao) {
       if (!confirm('Confirma a edição deste lançamento?')) return
+
+      if (editando?.grupo_parcelamento_id && camposCompartilhaveisMudaram()) {
+        aplicarATodasAsParcelas = confirm(
+          'Esse lançamento faz parte de um parcelamento. Aplicar a descrição, categoria, meio ' +
+            'e valor da parcela a TODAS as parcelas deste grupo?\n\n' +
+            'OK = todas as parcelas · Cancelar = só esta parcela'
+        )
+      }
     }
 
     setSalvando(true)
-    const { error } = parcelado && !modoEdicao ? await salvarParcelado() : await salvarUnico()
+    const { error } =
+      parcelado && !modoEdicao ? await salvarParcelado() : await salvarUnico(aplicarATodasAsParcelas)
     setSalvando(false)
 
     if (error) {
@@ -185,7 +226,16 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
         {!(parcelado && !modoEdicao) && (
           <label className="field">
             <span>Valor efetivo (R$) — opcional</span>
-            <input inputMode="decimal" value={valorEfetivo} onChange={(e) => setValorEfetivo(e.target.value)} placeholder="deixe em branco se não souber" />
+            <input
+              inputMode="decimal"
+              value={valorEfetivo}
+              onChange={(e) => {
+                const v = e.target.value
+                setValorEfetivo(v)
+                if (v.trim() !== '') setPago(true)
+              }}
+              placeholder="deixe em branco se não souber"
+            />
           </label>
         )}
       </div>
@@ -261,6 +311,11 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
             <span>Marcar como recorrente</span>
           </label>
         </div>
+      )}
+      {!(parcelado && !modoEdicao) && (
+        <p className="field-hint" style={{ marginTop: -8 }}>
+          Preencher o valor efetivo já marca como pago automaticamente.
+        </p>
       )}
 
       <label className="field">
