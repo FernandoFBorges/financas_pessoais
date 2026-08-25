@@ -54,3 +54,14 @@ export function competenciaLabel(mes: number, ano: number) {
 export function formatBRL(valor: number) {
   return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
+
+// Regra única do app: um lançamento está "pago" quando tem valor efetivo
+// lançado e esse valor é maior que zero. Não existe mais um estado manual
+// de "pago" separado — é sempre derivado do valor efetivo.
+export function valorEfetivoRealizado(t: { valor_efetivo: number | null }) {
+  return t.valor_efetivo != null ? Number(t.valor_efetivo) : 0
+}
+
+export function estaPago(t: { valor_efetivo: number | null }) {
+  return t.valor_efetivo != null && Number(t.valor_efetivo) > 0
+}

@@ -647,6 +647,13 @@ body {
   align-items: center;
   margin-bottom: 12px;
   gap: 10px;
+  flex-wrap: wrap;
+}
+
+.column-toolbar-selects {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .selecao-inverter-btn {
@@ -825,27 +832,14 @@ body {
   white-space: nowrap;
 }
 
-.col-pago, .col-acoes {
+.col-acoes {
   text-align: center;
   width: 1%;
   white-space: nowrap;
 }
 
-.pago-toggle {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: 1.5px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-ink-soft);
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.pago-toggle.pago {
-  background: var(--color-receita);
-  color: #fff;
-  border-color: var(--color-receita);
+.tx-valor-pago {
+  background: var(--color-receita-bg);
 }
 
 .icon-btn {
@@ -1215,7 +1209,6 @@ body {
   }
 
   .grid-table td.col-check,
-  .grid-table td.col-pago,
   .grid-table td.col-acoes {
     display: inline-block;
     margin-right: 14px;

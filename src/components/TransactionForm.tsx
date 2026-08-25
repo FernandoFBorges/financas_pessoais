@@ -42,7 +42,6 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
   )
   const [competenciaMes, setCompetenciaMes] = useState(base?.competencia_mes ?? mes)
   const [competenciaAno, setCompetenciaAno] = useState(base?.competencia_ano ?? ano)
-  const [pago, setPago] = useState(editando?.pago ?? false)
   const [recorrente, setRecorrente] = useState(editando?.recorrente ?? !!prefill)
   const [observacao, setObservacao] = useState(base?.observacao ?? '')
   const [salvando, setSalvando] = useState(false)
@@ -57,9 +56,6 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
   const modoEdicao = !!editando
 
   async function salvarUnico(aplicarATodasAsParcelas: boolean) {
-    // Preencher o valor efetivo já é, por si só, a confirmação de pagamento/recebimento.
-    const pagoFinal = valorEfetivo.trim() !== '' ? true : pago
-
     const payload = {
       tipo,
       descricao,
@@ -70,7 +66,6 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
       data_lancamento: dataLancamento,
       competencia_mes: competenciaMes,
       competencia_ano: competenciaAno,
-      pago: pagoFinal,
       recorrente,
       observacao: observacao || null,
     }
@@ -118,7 +113,6 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
           parcela === parcelaInicial ? dataLancamento : `${anoAtual}-${String(mesAtual).padStart(2, '0')}-01`,
         competencia_mes: mesAtual,
         competencia_ano: anoAtual,
-        pago: false,
         parcela_atual: parcela,
         parcela_total: parcelaTotal,
         grupo_parcelamento_id: grupoId,
@@ -229,11 +223,7 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
             <input
               inputMode="decimal"
               value={valorEfetivo}
-              onChange={(e) => {
-                const v = e.target.value
-                setValorEfetivo(v)
-                if (v.trim() !== '') setPago(true)
-              }}
+              onChange={(e) => setValorEfetivo(e.target.value)}
               placeholder="deixe em branco se não souber"
             />
           </label>
@@ -303,10 +293,6 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
       {!(parcelado && !modoEdicao) && (
         <div className="field-row checkboxes">
           <label className="checkbox-field">
-            <input type="checkbox" checked={pago} onChange={(e) => setPago(e.target.checked)} />
-            <span>Já pago / recebido</span>
-          </label>
-          <label className="checkbox-field">
             <input type="checkbox" checked={recorrente} onChange={(e) => setRecorrente(e.target.checked)} />
             <span>Marcar como recorrente</span>
           </label>
@@ -314,7 +300,8 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
       )}
       {!(parcelado && !modoEdicao) && (
         <p className="field-hint" style={{ marginTop: -8 }}>
-          Preencher o valor efetivo já marca como pago automaticamente.
+          Um lançamento é considerado pago quando tem valor efetivo maior que zero — não existe
+          marcação de "pago" separada.
         </p>
       )}
 

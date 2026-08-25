@@ -5,13 +5,7 @@ import { useLookups } from '../lib/useLookups'
 import Modal from '../components/Modal'
 import TransactionForm, { type PrefillData } from '../components/TransactionForm'
 import TransactionColumn from '../components/TransactionColumn'
-import { formatBRL, type Tipo, type Transaction } from '../lib/types'
-
-function valorEfetivoRealizado(t: { valor: number; valor_efetivo: number | null; pago: boolean }) {
-  if (t.valor_efetivo != null) return Number(t.valor_efetivo)
-  if (t.pago) return Number(t.valor)
-  return 0
-}
+import { estaPago, formatBRL, valorEfetivoRealizado, type Tipo, type Transaction } from '../lib/types'
 
 export default function Dashboard() {
   const { mes, ano } = useCompetencia()
@@ -55,15 +49,15 @@ export default function Dashboard() {
 
   // Soma efetiva (receita - despesa) de todas as competências ANTERIORES à selecionada,
   // pra saber quanto já tinha acumulado ao entrar no mês atual — e, de quebra, quanto
-  // de despesa de meses passados ainda ficou pendente (não paga).
+  // de despesa de meses passados ainda ficou pendente (sem valor efetivo lançado).
   useEffect(() => {
     async function carregarAcumulado() {
       const { data } = await supabase
         .from('transactions')
-        .select('tipo, valor, valor_efetivo, pago')
+        .select('tipo, valor, valor_efetivo')
         .or(`competencia_ano.lt.${ano},and(competencia_ano.eq.${ano},competencia_mes.lt.${mes})`)
 
-      const linhas = (data ?? []) as { tipo: string; valor: number; valor_efetivo: number | null; pago: boolean }[]
+      const linhas = (data ?? []) as { tipo: string; valor: number; valor_efetivo: number | null }[]
       const soma = linhas.reduce((acc, t) => {
         const efetivo = valorEfetivoRealizado(t)
         return acc + (t.tipo === 'receita' ? efetivo : -efetivo)
@@ -71,7 +65,7 @@ export default function Dashboard() {
       setAcumuladoAnterior(soma)
 
       const pendente = linhas
-        .filter((t) => t.tipo === 'despesa' && !t.pago)
+        .filter((t) => t.tipo === 'despesa' && !estaPago(t))
         .reduce((acc, t) => acc + Number(t.valor), 0)
       setPendenteDespesasAnteriores(pendente)
     }
@@ -140,21 +134,8 @@ export default function Dashboard() {
     load()
   }
 
-  async function togglePago(t: Transaction) {
-    const novoPago = !t.pago
-    const patch =
-      novoPago && t.valor_efetivo == null
-        ? { pago: novoPago, valor_efetivo: t.valor }
-        : { pago: novoPago }
-    await supabase.from('transactions').update(patch).eq('id', t.id)
-    load()
-  }
-
   async function salvarEfetivo(t: Transaction, valor: number | null) {
-    // Lançar um valor efetivo já é, por si só, a confirmação do pagamento/recebimento.
-    // Limpar o valor efetivo desfaz essa confirmação.
-    const patch = valor != null ? { valor_efetivo: valor, pago: true } : { valor_efetivo: null, pago: false }
-    await supabase.from('transactions').update(patch).eq('id', t.id)
+    await supabase.from('transactions').update({ valor_efetivo: valor }).eq('id', t.id)
     load()
   }
 
@@ -176,9 +157,7 @@ export default function Dashboard() {
     // por linha, então precisa de um update individual por id (não dá com um só .in()).
     const selecionados = items.filter((i) => ids.includes(i.id))
     await Promise.all(
-      selecionados.map((t) =>
-        supabase.from('transactions').update({ valor_efetivo: t.valor, pago: true }).eq('id', t.id)
-      )
+      selecionados.map((t) => supabase.from('transactions').update({ valor_efetivo: t.valor }).eq('id', t.id))
     )
     load()
   }
@@ -244,7 +223,6 @@ export default function Dashboard() {
             paymentMethods={paymentMethods}
             onDuplicar={abrirDuplicar}
             onEditar={abrirEditar}
-            onTogglePago={togglePago}
             onSalvarEfetivo={salvarEfetivo}
             onExcluir={excluir}
             onRegistrarPagamentoEmMassa={registrarPagamentoEmMassa}
@@ -258,7 +236,6 @@ export default function Dashboard() {
             paymentMethods={paymentMethods}
             onDuplicar={abrirDuplicar}
             onEditar={abrirEditar}
-            onTogglePago={togglePago}
             onSalvarEfetivo={salvarEfetivo}
             onExcluir={excluir}
             onRegistrarPagamentoEmMassa={registrarPagamentoEmMassa}

@@ -1,11 +1,11 @@
 import { Fragment, useMemo, useState, type DragEvent, type MouseEvent } from 'react'
-import { formatBRL, type Category, type PaymentMethod, type Tipo, type Transaction } from '../lib/types'
+import { estaPago, formatBRL, valorEfetivoRealizado, type Category, type PaymentMethod, type Tipo, type Transaction } from '../lib/types'
 
 type Agrupamento = 'nenhum' | 'categoria' | 'meio' | 'pago'
 type FiltroPago = 'todos' | 'pago' | 'pendente'
 type ColKey = 'descricao' | 'categoria' | 'meio' | 'data' | 'previsto' | 'efetivo'
 type SortDir = 'asc' | 'desc'
-type FiltroPopoverKey = 'categoria' | 'meio' | 'pago' | null
+type FiltroPopoverKey = 'categoria' | 'meio' | null
 
 const COLUMN_LABELS: Record<ColKey, string> = {
   descricao: 'Descrição',
@@ -26,22 +26,15 @@ interface Props {
   paymentMethods: PaymentMethod[]
   onDuplicar: (t: Transaction) => void
   onEditar: (t: Transaction) => void
-  onTogglePago: (t: Transaction) => void
   onSalvarEfetivo: (t: Transaction, valor: number | null) => void
   onExcluir: (t: Transaction) => void
   onRegistrarPagamentoEmMassa: (ids: string[]) => Promise<void>
   onExcluirEmMassa: (ids: string[]) => Promise<void>
 }
 
-function valorEfetivoRealizado(t: Transaction) {
-  if (t.valor_efetivo != null) return Number(t.valor_efetivo)
-  if (t.pago) return Number(t.valor)
-  return 0
-}
-
 export default function TransactionColumn({
   tipo, titulo, items, categories, paymentMethods,
-  onDuplicar, onEditar, onTogglePago, onSalvarEfetivo, onExcluir,
+  onDuplicar, onEditar, onSalvarEfetivo, onExcluir,
   onRegistrarPagamentoEmMassa, onExcluirEmMassa,
 }: Props) {
   const [filtroCategoria, setFiltroCategoria] = useState('')
@@ -67,8 +60,8 @@ export default function TransactionColumn({
   const filtrados = items.filter((t) => {
     if (filtroCategoria && t.categoria_id !== filtroCategoria) return false
     if (filtroMeio && t.meio_pagamento_id !== filtroMeio) return false
-    if (filtroPago === 'pago' && !t.pago) return false
-    if (filtroPago === 'pendente' && t.pago) return false
+    if (filtroPago === 'pago' && !estaPago(t)) return false
+    if (filtroPago === 'pendente' && estaPago(t)) return false
     return true
   })
 
@@ -116,7 +109,7 @@ export default function TransactionColumn({
     if (
       !confirm(
         `Registrar pagamento de ${ids.length} lançamento(s) selecionado(s)?\n\n` +
-          'O valor previsto de cada um vira o valor efetivo, e todos ficam marcados como pagos.'
+          'O valor previsto de cada um vira o valor efetivo (isso já conta como pago).'
       )
     )
       return
@@ -174,7 +167,7 @@ export default function TransactionColumn({
       let chave: string
       if (agrupamento === 'categoria') chave = t.categoria_id ?? '__sem__'
       else if (agrupamento === 'meio') chave = t.meio_pagamento_id ?? '__sem__'
-      else chave = t.pago ? 'pago' : 'pendente'
+      else chave = estaPago(t) ? 'pago' : 'pendente'
 
       if (!map.has(chave)) map.set(chave, [])
       map.get(chave)!.push(t)
@@ -265,7 +258,11 @@ export default function TransactionColumn({
       )
     }
     return (
-      <button className="tx-valor-efetivo" onClick={() => iniciarEdicaoEfetivo(t)} title="Clique para editar o valor efetivo">
+      <button
+        className={'tx-valor-efetivo' + (estaPago(t) ? ' tx-valor-pago' : '')}
+        onClick={() => iniciarEdicaoEfetivo(t)}
+        title="Clique para editar o valor efetivo — lançar um valor aqui já conta como pago"
+      >
         {t.valor_efetivo != null ? formatBRL(Number(t.valor_efetivo)) : '— definir'}
       </button>
     )
@@ -291,7 +288,6 @@ export default function TransactionColumn({
 
   const nomeFiltroCategoriaAtivo = filtroCategoria ? nomeCategoria(filtroCategoria) : null
   const nomeFiltroMeioAtivo = filtroMeio ? nomeMeio(filtroMeio) : null
-  const nomeFiltroPagoAtivo = filtroPago !== 'todos' ? (filtroPago === 'pago' ? 'Pago' : 'Pendente') : null
 
   return (
     <div className={'ledger-card column-card column-' + tipo} onClick={() => setFiltroPopoverAberto(null)}>
@@ -306,12 +302,19 @@ export default function TransactionColumn({
         <button type="button" className="link-btn selecao-inverter-btn" onClick={inverterSelecao}>
           Inverter seleção
         </button>
-        <select value={agrupamento} onChange={(e) => setAgrupamento(e.target.value as Agrupamento)}>
-          <option value="nenhum">Sem agrupamento</option>
-          <option value="categoria">Agrupar por categoria</option>
-          <option value="meio">Agrupar por meio</option>
-          <option value="pago">Agrupar por status</option>
-        </select>
+        <div className="column-toolbar-selects">
+          <select value={filtroPago} onChange={(e) => setFiltroPago(e.target.value as FiltroPago)}>
+            <option value="todos">Pago e pendente</option>
+            <option value="pago">Só pagos</option>
+            <option value="pendente">Só pendentes</option>
+          </select>
+          <select value={agrupamento} onChange={(e) => setAgrupamento(e.target.value as Agrupamento)}>
+            <option value="nenhum">Sem agrupamento</option>
+            <option value="categoria">Agrupar por categoria</option>
+            <option value="meio">Agrupar por meio</option>
+            <option value="pago">Agrupar por status</option>
+          </select>
+        </div>
       </div>
 
       {selecionados.size > 0 && (
@@ -410,34 +413,6 @@ export default function TransactionColumn({
                     )}
                   </th>
                 ))}
-                <th className="col-pago">
-                  <span className="grid-th-inner">
-                    Pago
-                    <span className="th-filter-wrap">
-                      <button
-                        className={'th-filter-btn' + (nomeFiltroPagoAtivo ? ' active' : '')}
-                        onClick={(e) => abrirFecharPopover('pago', e)}
-                        title="Filtrar"
-                      >
-                        ▾
-                      </button>
-                      {filtroPopoverAberto === 'pago' && (
-                        <div className="th-filter-popover" onClick={(e) => e.stopPropagation()}>
-                          <button className={'th-filter-option' + (filtroPago === 'todos' ? ' active' : '')} onClick={() => { setFiltroPago('todos'); setFiltroPopoverAberto(null) }}>
-                            Pago e pendente
-                          </button>
-                          <button className={'th-filter-option' + (filtroPago === 'pago' ? ' active' : '')} onClick={() => { setFiltroPago('pago'); setFiltroPopoverAberto(null) }}>
-                            Só pagos
-                          </button>
-                          <button className={'th-filter-option' + (filtroPago === 'pendente' ? ' active' : '')} onClick={() => { setFiltroPago('pendente'); setFiltroPopoverAberto(null) }}>
-                            Só pendentes
-                          </button>
-                        </div>
-                      )}
-                    </span>
-                  </span>
-                  {nomeFiltroPagoAtivo && <span className="th-filter-active">{nomeFiltroPagoAtivo}</span>}
-                </th>
                 <th className="col-acoes"></th>
               </tr>
             </thead>
@@ -446,7 +421,7 @@ export default function TransactionColumn({
                 <Fragment key={g.chave}>
                   {agrupamento !== 'nenhum' && (
                     <tr className="group-row">
-                      <td colSpan={colOrder.length + 3}>
+                      <td colSpan={colOrder.length + 2}>
                         <span className="group-row-inner">
                           <span>{g.label}</span>
                           <span className="group-header-totais">
@@ -469,15 +444,6 @@ export default function TransactionColumn({
                           {renderCelula(t, key)}
                         </td>
                       ))}
-                      <td className="col-pago" data-label="Pago">
-                        <button
-                          className={'pago-toggle' + (t.pago ? ' pago' : '')}
-                          onClick={() => onTogglePago(t)}
-                          title={t.pago ? 'Marcar como pendente' : 'Marcar como pago'}
-                        >
-                          {t.pago ? '✓' : '·'}
-                        </button>
-                      </td>
                       <td className="col-acoes" data-label="Ações">
                         <button className="icon-btn" onClick={() => onEditar(t)} title="Editar">✎</button>
                         <button className="icon-btn" onClick={() => onDuplicar(t)} title="Duplicar para o próximo mês">⧉</button>
