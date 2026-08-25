@@ -29,6 +29,8 @@ interface Props {
   onTogglePago: (t: Transaction) => void
   onSalvarEfetivo: (t: Transaction, valor: number | null) => void
   onExcluir: (t: Transaction) => void
+  onRegistrarPagamentoEmMassa: (ids: string[]) => Promise<void>
+  onExcluirEmMassa: (ids: string[]) => Promise<void>
 }
 
 function valorEfetivoRealizado(t: Transaction) {
@@ -40,6 +42,7 @@ function valorEfetivoRealizado(t: Transaction) {
 export default function TransactionColumn({
   tipo, titulo, items, categories, paymentMethods,
   onDuplicar, onEditar, onTogglePago, onSalvarEfetivo, onExcluir,
+  onRegistrarPagamentoEmMassa, onExcluirEmMassa,
 }: Props) {
   const [filtroCategoria, setFiltroCategoria] = useState('')
   const [filtroMeio, setFiltroMeio] = useState('')
@@ -54,6 +57,8 @@ export default function TransactionColumn({
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [arrastando, setArrastando] = useState<ColKey | null>(null)
   const [filtroPopoverAberto, setFiltroPopoverAberto] = useState<FiltroPopoverKey>(null)
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
+  const [processandoMassa, setProcessandoMassa] = useState(false)
 
   const categoriasDoTipo = categories.filter((c) => c.tipo === tipo)
   const nomeCategoria = (id: string | null) => categories.find((c) => c.id === id)?.nome ?? '—'
@@ -69,6 +74,72 @@ export default function TransactionColumn({
 
   const totalPrevisto = filtrados.reduce((s, t) => s + Number(t.valor), 0)
   const totalEfetivo = filtrados.reduce((s, t) => s + valorEfetivoRealizado(t), 0)
+
+  function toggleSelecionado(id: string) {
+    setSelecionados((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const todosFiltradosSelecionados = filtrados.length > 0 && filtrados.every((t) => selecionados.has(t.id))
+
+  function alternarSelecionarTodos() {
+    setSelecionados((prev) => {
+      if (todosFiltradosSelecionados) {
+        const next = new Set(prev)
+        filtrados.forEach((t) => next.delete(t.id))
+        return next
+      }
+      const next = new Set(prev)
+      filtrados.forEach((t) => next.add(t.id))
+      return next
+    })
+  }
+
+  function inverterSelecao() {
+    setSelecionados((prev) => {
+      const next = new Set(prev)
+      filtrados.forEach((t) => {
+        if (next.has(t.id)) next.delete(t.id)
+        else next.add(t.id)
+      })
+      return next
+    })
+  }
+
+  async function registrarPagamentoSelecionados() {
+    const ids = [...selecionados]
+    if (ids.length === 0) return
+    if (
+      !confirm(
+        `Registrar pagamento de ${ids.length} lançamento(s) selecionado(s)?\n\n` +
+          'O valor previsto de cada um vira o valor efetivo, e todos ficam marcados como pagos.'
+      )
+    )
+      return
+    setProcessandoMassa(true)
+    await onRegistrarPagamentoEmMassa(ids)
+    setProcessandoMassa(false)
+    setSelecionados(new Set())
+  }
+
+  async function excluirSelecionados() {
+    const ids = [...selecionados]
+    if (ids.length === 0) return
+    if (
+      !confirm(
+        `Excluir ${ids.length} lançamento(s) selecionado(s)? Isso pode incluir parcelas de parcelamento.`
+      )
+    )
+      return
+    setProcessandoMassa(true)
+    await onExcluirEmMassa(ids)
+    setProcessandoMassa(false)
+    setSelecionados(new Set())
+  }
 
   function campoOrdenavel(t: Transaction, key: ColKey): string | number {
     switch (key) {
@@ -232,6 +303,9 @@ export default function TransactionColumn({
       </div>
 
       <div className="column-toolbar">
+        <button type="button" className="link-btn selecao-inverter-btn" onClick={inverterSelecao}>
+          Inverter seleção
+        </button>
         <select value={agrupamento} onChange={(e) => setAgrupamento(e.target.value as Agrupamento)}>
           <option value="nenhum">Sem agrupamento</option>
           <option value="categoria">Agrupar por categoria</option>
@@ -240,6 +314,18 @@ export default function TransactionColumn({
         </select>
       </div>
 
+      {selecionados.size > 0 && (
+        <div className="selecao-bar">
+          <span>{selecionados.size} selecionado(s)</span>
+          <button className="btn btn-primary btn-sm" onClick={registrarPagamentoSelecionados} disabled={processandoMassa}>
+            Registrar pagamento
+          </button>
+          <button className="btn btn-ghost btn-sm" onClick={excluirSelecionados} disabled={processandoMassa}>
+            Excluir
+          </button>
+        </div>
+      )}
+
       {filtrados.length === 0 ? (
         <p className="empty-state">Nada por aqui com esse filtro.</p>
       ) : (
@@ -247,6 +333,14 @@ export default function TransactionColumn({
           <table className="grid-table">
             <thead>
               <tr>
+                <th className="col-check">
+                  <input
+                    type="checkbox"
+                    checked={todosFiltradosSelecionados}
+                    onChange={alternarSelecionarTodos}
+                    title="Selecionar todos os visíveis"
+                  />
+                </th>
                 {colOrder.map((key) => (
                   <th
                     key={key}
@@ -352,7 +446,7 @@ export default function TransactionColumn({
                 <Fragment key={g.chave}>
                   {agrupamento !== 'nenhum' && (
                     <tr className="group-row">
-                      <td colSpan={colOrder.length + 2}>
+                      <td colSpan={colOrder.length + 3}>
                         <span className="group-row-inner">
                           <span>{g.label}</span>
                           <span className="group-header-totais">
@@ -367,6 +461,9 @@ export default function TransactionColumn({
                   )}
                   {g.itens.map((t) => (
                     <tr key={t.id} className={t.tipo === 'receita' ? 'row-receita' : 'row-despesa'}>
+                      <td className="col-check" data-label="">
+                        <input type="checkbox" checked={selecionados.has(t.id)} onChange={() => toggleSelecionado(t.id)} />
+                      </td>
                       {colOrder.map((key) => (
                         <td key={key} data-label={COLUMN_LABELS[key]} className={key === 'previsto' || key === 'efetivo' ? 'col-valor' : ''}>
                           {renderCelula(t, key)}

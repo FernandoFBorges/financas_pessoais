@@ -617,8 +617,38 @@ body {
 
 .column-toolbar {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 12px;
+  gap: 10px;
+}
+
+.selecao-inverter-btn {
+  font-weight: 600;
+}
+
+.col-check {
+  width: 1%;
+  text-align: center;
+  padding: 6px 6px !important;
+}
+
+.selecao-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.btn-sm {
+  padding: 6px 14px;
+  font-size: 12.5px;
 }
 
 .column-toolbar select {
@@ -1158,6 +1188,7 @@ body {
     color: var(--color-ink-soft);
   }
 
+  .grid-table td.col-check,
   .grid-table td.col-pago,
   .grid-table td.col-acoes {
     display: inline-block;

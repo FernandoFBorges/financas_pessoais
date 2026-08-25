@@ -154,6 +154,23 @@ export default function Dashboard() {
     load()
   }
 
+  async function registrarPagamentoEmMassa(ids: string[]) {
+    // Cada lançamento leva seu PRÓPRIO valor previsto pro efetivo — o valor muda
+    // por linha, então precisa de um update individual por id (não dá com um só .in()).
+    const selecionados = items.filter((i) => ids.includes(i.id))
+    await Promise.all(
+      selecionados.map((t) =>
+        supabase.from('transactions').update({ valor_efetivo: t.valor, pago: true }).eq('id', t.id)
+      )
+    )
+    load()
+  }
+
+  async function excluirEmMassa(ids: string[]) {
+    await supabase.from('transactions').delete().in('id', ids)
+    load()
+  }
+
   const modalTitulo = modalEditando
     ? 'Editar lançamento'
     : modalPrefill
@@ -200,6 +217,8 @@ export default function Dashboard() {
             onTogglePago={togglePago}
             onSalvarEfetivo={salvarEfetivo}
             onExcluir={excluir}
+            onRegistrarPagamentoEmMassa={registrarPagamentoEmMassa}
+            onExcluirEmMassa={excluirEmMassa}
           />
           <TransactionColumn
             tipo="receita"
@@ -212,6 +231,8 @@ export default function Dashboard() {
             onTogglePago={togglePago}
             onSalvarEfetivo={salvarEfetivo}
             onExcluir={excluir}
+            onRegistrarPagamentoEmMassa={registrarPagamentoEmMassa}
+            onExcluirEmMassa={excluirEmMassa}
           />
         </div>
       )}
