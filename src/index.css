@@ -1245,13 +1245,12 @@ body {
   }
 }
 
-/* Sidebar fixa no topo — tema/sair sempre acessíveis mesmo com lista longa */
+/* Sidebar fixa — ocupa toda a altura da tela e não rola com a página */
 @media (min-width: 861px) {
   .sidebar {
     position: sticky !important;
     top: 0;
-    align-self: start;
-    max-height: 100vh;
+    height: 100vh;
     overflow-y: auto;
   }
 }
