@@ -1224,3 +1224,47 @@ body {
     padding: 10px 0 4px !important;
   }
 }
+
+/* ===== PATCH 2026-08-26 ===== */
+
+/* Sidebar mais estreita — ganha espaço pro dashboard */
+@media (min-width: 861px) {
+  .app-shell {
+    grid-template-columns: 200px 1fr !important;
+  }
+  .sidebar {
+    padding: 24px 14px !important;
+    gap: 24px !important;
+  }
+  .nav-link {
+    font-size: 13px !important;
+    padding: 8px 10px !important;
+  }
+  .brand-name {
+    font-size: 15px !important;
+  }
+}
+
+/* Sidebar fixa no topo — tema/sair sempre acessíveis mesmo com lista longa */
+@media (min-width: 861px) {
+  .sidebar {
+    position: sticky !important;
+    top: 0;
+    align-self: start;
+    max-height: 100vh;
+    overflow-y: auto;
+  }
+}
+
+/* Dropdown de meses legível no tema escuro — fundo escuro + letra branca */
+[data-theme='dark'] .tab-select {
+  background: var(--color-surface) !important;
+}
+[data-theme='dark'] .tab-select option,
+[data-theme='dark'] .tab-year {
+  background: var(--color-surface) !important;
+  color: var(--color-ink) !important;
+}
+[data-theme='dark'] .competencia-tab {
+  background: var(--color-surface) !important;
+}

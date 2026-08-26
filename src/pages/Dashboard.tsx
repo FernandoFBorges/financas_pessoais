@@ -5,18 +5,16 @@ import { useLookups } from '../lib/useLookups'
 import Modal from '../components/Modal'
 import TransactionForm, { type PrefillData } from '../components/TransactionForm'
 import TransactionColumn from '../components/TransactionColumn'
-import { estaPago, formatBRL, valorEfetivoRealizado, type Tipo, type Transaction } from '../lib/types'
+import { MESES, estaPago, formatBRL, valorEfetivoRealizado, type Tipo, type Transaction } from '../lib/types'
 
 export default function Dashboard() {
   const { mes, ano } = useCompetencia()
   const { categories, paymentMethods } = useLookups()
   const [items, setItems] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
-
   const [saldoInicialGeral, setSaldoInicialGeral] = useState(0)
   const [acumuladoAnterior, setAcumuladoAnterior] = useState(0)
   const [pendenteDespesasAnteriores, setPendenteDespesasAnteriores] = useState(0)
-
   const [modalAberto, setModalAberto] = useState(false)
   const [modalTipo, setModalTipo] = useState<Tipo>('despesa')
   const [modalPrefill, setModalPrefill] = useState<PrefillData | null>(null)
@@ -74,15 +72,12 @@ export default function Dashboard() {
 
   const receitas = items.filter((i) => i.tipo === 'receita')
   const despesas = items.filter((i) => i.tipo === 'despesa')
-
   const previstoReceitas = receitas.reduce((s, i) => s + Number(i.valor), 0)
   const previstoDespesas = despesas.reduce((s, i) => s + Number(i.valor), 0)
   const efetivoReceitas = receitas.reduce((s, i) => s + valorEfetivoRealizado(i), 0)
   const efetivoDespesas = despesas.reduce((s, i) => s + valorEfetivoRealizado(i), 0)
-
   const diferencaReceitas = efetivoReceitas - previstoReceitas
   const diferencaDespesas = efetivoDespesas - previstoDespesas
-
   const saldoInicialDoMes = saldoInicialGeral + acumuladoAnterior
   const saldoAtual = saldoInicialDoMes + efetivoReceitas - efetivoDespesas
   const diferencaSaldo = saldoAtual - saldoInicialDoMes
@@ -97,6 +92,51 @@ export default function Dashboard() {
     setModalPrefill(null)
     setModalEditando(null)
     setModalAberto(true)
+  }
+
+  async function duplicarRecorrentes() {
+    const prevMes = mes === 1 ? 12 : mes - 1
+    const prevAno = mes === 1 ? ano - 1 : ano
+
+    const { data: recorrentes } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('competencia_mes', prevMes)
+      .eq('competencia_ano', prevAno)
+      .eq('recorrente', true)
+
+    if (!recorrentes || recorrentes.length === 0) {
+      alert(`Nenhum lançamento recorrente encontrado em ${MESES[prevMes - 1]}/${prevAno}.`)
+      return
+    }
+
+    if (
+      !confirm(
+        `Duplicar ${recorrentes.length} lançamento(s) recorrente(s) de ${MESES[prevMes - 1]}/${prevAno} para ${MESES[mes - 1]}/${ano}?\n\n` +
+          'O valor efetivo vem zerado — você marca como pago quando acontecer.'
+      )
+    )
+      return
+
+    const novos = recorrentes.map((t: Transaction) => ({
+      tipo: t.tipo,
+      descricao: t.descricao,
+      categoria_id: t.categoria_id,
+      meio_pagamento_id: t.meio_pagamento_id,
+      valor: t.valor,
+      valor_efetivo: null,
+      data_lancamento: new Date().toISOString().slice(0, 10),
+      competencia_mes: mes,
+      competencia_ano: ano,
+      parcela_atual: null,
+      parcela_total: null,
+      grupo_parcelamento_id: null,
+      recorrente: true,
+      observacao: t.observacao,
+    }))
+
+    await supabase.from('transactions').insert(novos)
+    load()
   }
 
   function abrirDuplicar(t: Transaction) {
@@ -212,6 +252,9 @@ export default function Dashboard() {
       </div>
 
       <div className="page-toolbar">
+        <button className="btn btn-ghost" onClick={duplicarRecorrentes}>
+          ↻ Duplicar recorrentes
+        </button>
         <button className="btn btn-primary" onClick={abrirNovo}>+ Novo lançamento</button>
       </div>
 
