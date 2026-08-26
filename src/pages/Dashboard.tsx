@@ -85,6 +85,7 @@ export default function Dashboard() {
 
   const saldoInicialDoMes = saldoInicialGeral + acumuladoAnterior
   const saldoAtual = saldoInicialDoMes + efetivoReceitas - efetivoDespesas
+  const diferencaSaldo = saldoAtual - saldoInicialDoMes
 
   function formatDiff(v: number) {
     const sinal = v > 0 ? '+' : ''
@@ -204,6 +205,9 @@ export default function Dashboard() {
         <div className={'stamp ' + (saldoAtual >= 0 ? 'stamp-positivo' : 'stamp-negativo')}>
           <span className="stamp-title">SALDO ATUAL</span>
           <span className="stamp-value">{formatBRL(saldoAtual)}</span>
+          <span className="stamp-sub">
+            {diferencaSaldo >= 0 ? '+' : ''}{formatBRL(diferencaSaldo)} vs. saldo inicial do mês
+          </span>
         </div>
       </div>
 
