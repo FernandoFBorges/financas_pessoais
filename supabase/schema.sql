@@ -153,3 +153,12 @@ create policy "user_settings_insert_own" on user_settings
   for insert with check (auth.uid() = user_id);
 create policy "user_settings_update_own" on user_settings
   for update using (auth.uid() = user_id);
+
+-- =========================================================
+-- Migração — remove a coluna "pago", que não é mais usada.
+-- Desde a introdução do valor efetivo, um lançamento é considerado
+-- pago quando valor_efetivo > 0 — não existe mais um estado manual
+-- separado. Rode isso uma vez no SQL Editor do Supabase.
+-- =========================================================
+
+alter table transactions drop column if exists pago;

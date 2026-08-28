@@ -41,6 +41,7 @@ export function CompetenciaProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// oxlint-disable-next-line react/only-export-components -- hook e Provider vivem juntos de propósito, arquivo pequeno o suficiente
 export function useCompetencia() {
   const ctx = useContext(CompetenciaContext)
   if (!ctx) throw new Error('useCompetencia precisa estar dentro de CompetenciaProvider')

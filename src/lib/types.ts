@@ -27,7 +27,6 @@ export interface Transaction {
   data_lancamento: string // YYYY-MM-DD
   competencia_mes: number // 1-12
   competencia_ano: number
-  pago: boolean
   parcela_atual: number | null
   parcela_total: number | null
   grupo_parcelamento_id: string | null

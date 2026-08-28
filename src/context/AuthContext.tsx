@@ -38,6 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// oxlint-disable-next-line react/only-export-components -- hook e Provider vivem juntos de propósito, arquivo pequeno o suficiente
 export function useAuth() {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth precisa estar dentro de AuthProvider')

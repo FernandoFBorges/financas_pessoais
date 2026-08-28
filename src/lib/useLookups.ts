@@ -19,6 +19,9 @@ export function useLookups() {
   }, [])
 
   useEffect(() => {
+    // Busca de categorias/meios ao montar — sincronização com o Supabase
+    // (sistema externo), não um cálculo derivável durante o render.
+    // oxlint-disable-next-line react/set-state-in-effect
     reload()
   }, [reload])
 

@@ -33,6 +33,9 @@ export default function Dashboard() {
   }, [mes, ano])
 
   useEffect(() => {
+    // Busca de dados ao trocar de competência — sincronização com o Supabase
+    // (sistema externo), não um cálculo derivável durante o render.
+    // oxlint-disable-next-line react/set-state-in-effect
     load()
   }, [load])
 

@@ -79,17 +79,17 @@ body {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 200px 1fr;
   min-height: 100vh;
 }
 
 .sidebar {
   background: linear-gradient(165deg, var(--color-primary) 0%, #1E3A8A 100%);
   color: #F4F0FE;
-  padding: 28px 20px;
+  padding: 24px 14px;
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 24px;
 }
 
 .brand {
@@ -238,6 +238,14 @@ body {
   border: none;
   color: var(--color-ink);
   cursor: pointer;
+}
+
+/* O menu nativo do <select> não herda as variáveis de tema do resto da página —
+   sem isso, no tema escuro a lista de meses ficava com fundo claro e texto claro,
+   ilegível exceto ao passar o mouse por cima. */
+.tab-select option {
+  background: var(--color-surface);
+  color: var(--color-ink);
 }
 
 .tab-year {
@@ -1225,45 +1233,19 @@ body {
   }
 }
 
-/* ===== PATCH 2026-08-26 ===== */
-
-/* Sidebar mais estreita — ganha espaço pro dashboard */
-@media (min-width: 861px) {
-  .app-shell {
-    grid-template-columns: 200px 1fr !important;
-  }
-  .sidebar {
-    padding: 24px 14px !important;
-    gap: 24px !important;
-  }
-  .nav-link {
-    font-size: 13px !important;
-    padding: 8px 10px !important;
-  }
-  .brand-name {
-    font-size: 15px !important;
-  }
-}
-
-/* Sidebar fixa — ocupa toda a altura da tela e não rola com a página */
+/* Sidebar: só no desktop — mais compacta e fixa (não rola com o conteúdo da página) */
 @media (min-width: 861px) {
   .sidebar {
-    position: sticky !important;
+    position: sticky;
     top: 0;
     height: 100vh;
     overflow-y: auto;
   }
-}
-
-/* Dropdown de meses legível no tema escuro — fundo escuro + letra branca */
-[data-theme='dark'] .tab-select {
-  background: var(--color-surface) !important;
-}
-[data-theme='dark'] .tab-select option,
-[data-theme='dark'] .tab-year {
-  background: var(--color-surface) !important;
-  color: var(--color-ink) !important;
-}
-[data-theme='dark'] .competencia-tab {
-  background: var(--color-surface) !important;
+  .nav-link {
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+  .brand-name {
+    font-size: 15px;
+  }
 }
