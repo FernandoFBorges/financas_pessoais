@@ -524,7 +524,7 @@ body {
 
 .dashboard-bar {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1.1fr;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1.1fr;
   gap: 14px;
   margin-bottom: 20px;
   align-items: stretch;
@@ -582,6 +582,7 @@ body {
 
 .dash-receita { color: var(--color-receita); }
 .dash-despesa { color: var(--color-despesa); }
+.dash-reserva { color: var(--color-primary); }
 
 .stamp {
   display: flex;
@@ -643,7 +644,39 @@ body {
 .page-toolbar {
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
   margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.reserva-mini-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.reserva-mini-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-size: 13px;
+}
+
+.reserva-mini-desc {
+  flex: 1;
+  color: var(--color-ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .column-total-bar {

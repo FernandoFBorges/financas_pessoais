@@ -5,7 +5,8 @@ import { useLookups } from '../lib/useLookups'
 import Modal from '../components/Modal'
 import TransactionForm, { type PrefillData } from '../components/TransactionForm'
 import TransactionColumn from '../components/TransactionColumn'
-import { MESES, estaPago, formatBRL, valorEfetivoRealizado, type Tipo, type Transaction } from '../lib/types'
+import ReservaForm from '../components/ReservaForm'
+import { MESES, estaPago, formatBRL, valorEfetivoRealizado, type ReservaMovimento, type Tipo, type Transaction } from '../lib/types'
 
 export default function Dashboard() {
   const { mes, ano } = useCompetencia()
@@ -19,6 +20,9 @@ export default function Dashboard() {
   const [modalTipo, setModalTipo] = useState<Tipo>('despesa')
   const [modalPrefill, setModalPrefill] = useState<PrefillData | null>(null)
   const [modalEditando, setModalEditando] = useState<Transaction | null>(null)
+  const [reservaItems, setReservaItems] = useState<ReservaMovimento[]>([])
+  const [reservaAcumuladaAnterior, setReservaAcumuladaAnterior] = useState(0)
+  const [reservaModalAberto, setReservaModalAberto] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -39,6 +43,21 @@ export default function Dashboard() {
     load()
   }, [load])
 
+  const loadReserva = useCallback(async () => {
+    const { data } = await supabase
+      .from('reserva_movimentos')
+      .select('*')
+      .eq('competencia_mes', mes)
+      .eq('competencia_ano', ano)
+      .order('data_lancamento', { ascending: true })
+    setReservaItems((data as ReservaMovimento[]) ?? [])
+  }, [mes, ano])
+
+  useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect
+    loadReserva()
+  }, [loadReserva])
+
   // Saldo inicial cadastrado em Parâmetros (uma vez só, não depende do mês)
   useEffect(() => {
     async function carregarSaldoInicial() {
@@ -50,7 +69,8 @@ export default function Dashboard() {
 
   // Soma efetiva (receita - despesa) de todas as competências ANTERIORES à selecionada,
   // pra saber quanto já tinha acumulado ao entrar no mês atual — e, de quebra, quanto
-  // de despesa de meses passados ainda ficou pendente (sem valor efetivo lançado).
+  // de despesa de meses passados ainda ficou pendente (sem valor efetivo lançado), e
+  // quanto já tinha ido pra reserva antes deste mês.
   useEffect(() => {
     async function carregarAcumulado() {
       const { data } = await supabase
@@ -69,6 +89,18 @@ export default function Dashboard() {
         .filter((t) => t.tipo === 'despesa' && !estaPago(t))
         .reduce((acc, t) => acc + Number(t.valor), 0)
       setPendenteDespesasAnteriores(pendente)
+
+      const { data: reservaAnterior } = await supabase
+        .from('reserva_movimentos')
+        .select('tipo, valor')
+        .or(`competencia_ano.lt.${ano},and(competencia_ano.eq.${ano},competencia_mes.lt.${mes})`)
+
+      const linhasReserva = (reservaAnterior ?? []) as { tipo: string; valor: number }[]
+      const netReserva = linhasReserva.reduce(
+        (acc, r) => acc + (r.tipo === 'deposito' ? Number(r.valor) : -Number(r.valor)),
+        0
+      )
+      setReservaAcumuladaAnterior(netReserva)
     }
     carregarAcumulado()
   }, [mes, ano])
@@ -81,8 +113,16 @@ export default function Dashboard() {
   const efetivoDespesas = despesas.reduce((s, i) => s + valorEfetivoRealizado(i), 0)
   const diferencaReceitas = efetivoReceitas - previstoReceitas
   const diferencaDespesas = efetivoDespesas - previstoDespesas
-  const saldoInicialDoMes = saldoInicialGeral + acumuladoAnterior
-  const saldoAtual = saldoInicialDoMes + efetivoReceitas - efetivoDespesas
+
+  const depositosMes = reservaItems.filter((r) => r.tipo === 'deposito').reduce((s, r) => s + Number(r.valor), 0)
+  const resgatesMes = reservaItems.filter((r) => r.tipo === 'resgate').reduce((s, r) => s + Number(r.valor), 0)
+  const netReservaMes = depositosMes - resgatesMes
+  const reservaAtual = reservaAcumuladaAnterior + netReservaMes
+
+  // Dinheiro que foi pra reserva sai do saldo principal; dinheiro que voltou da
+  // reserva entra de novo — por isso o net da reserva sempre entra com sinal trocado.
+  const saldoInicialDoMes = saldoInicialGeral + acumuladoAnterior - reservaAcumuladaAnterior
+  const saldoAtual = saldoInicialDoMes + efetivoReceitas - efetivoDespesas - netReservaMes
   const diferencaSaldo = saldoAtual - saldoInicialDoMes
 
   function formatDiff(v: number) {
@@ -211,6 +251,25 @@ export default function Dashboard() {
     load()
   }
 
+  function abrirReserva() {
+    setReservaModalAberto(true)
+  }
+
+  function fecharReserva() {
+    setReservaModalAberto(false)
+  }
+
+  function onReservaSalva() {
+    fecharReserva()
+    loadReserva()
+  }
+
+  async function excluirMovimentoReserva(m: ReservaMovimento) {
+    if (!confirm('Excluir este movimento de reserva?')) return
+    await supabase.from('reserva_movimentos').delete().eq('id', m.id)
+    loadReserva()
+  }
+
   function somarMeses(m: number, a: number, delta: number) {
     const totalMeses = (a * 12 + (m - 1)) + delta
     return { mes: (((totalMeses % 12) + 12) % 12) + 1, ano: Math.floor(totalMeses / 12) }
@@ -322,6 +381,15 @@ export default function Dashboard() {
               </span>
             )}
           </div>
+          <div className="ledger-card dash-card">
+            <span className="total-label">Reserva</span>
+            <span className="total-value mono dash-reserva">{formatBRL(reservaAtual)}</span>
+            {netReservaMes !== 0 && (
+              <span className="dash-card-sub">
+                {netReservaMes >= 0 ? '+' : ''}{formatBRL(netReservaMes)} este mês
+              </span>
+            )}
+          </div>
           <div className={'stamp ' + (saldoAtual >= 0 ? 'stamp-positivo' : 'stamp-negativo')}>
             <span className="stamp-title">SALDO ATUAL</span>
             <span className="stamp-value">{formatBRL(saldoAtual)}</span>
@@ -335,8 +403,26 @@ export default function Dashboard() {
           <button className="btn btn-ghost" onClick={duplicarRecorrentes}>
             ↻ Duplicar recorrentes
           </button>
+          <button className="btn btn-ghost" onClick={abrirReserva}>
+            🏦 Movimentar reserva
+          </button>
           <button className="btn btn-primary" onClick={abrirNovo}>+ Novo lançamento</button>
         </div>
+
+        {reservaItems.length > 0 && (
+          <ul className="reserva-mini-list">
+            {reservaItems.map((r) => (
+              <li key={r.id}>
+                <span className={'tag ' + (r.tipo === 'deposito' ? 'tag-despesa' : 'tag-receita')}>
+                  {r.tipo === 'deposito' ? 'Depósito' : 'Resgate'}
+                </span>
+                <span className="reserva-mini-desc">{r.descricao || '—'}</span>
+                <span className="mono">{formatBRL(Number(r.valor))}</span>
+                <button className="icon-btn icon-btn-danger" onClick={() => excluirMovimentoReserva(r)} title="Excluir">✕</button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {loading ? (
@@ -382,6 +468,10 @@ export default function Dashboard() {
           onSaved={onSalvo}
           onCancel={fecharModal}
         />
+      </Modal>
+
+      <Modal open={reservaModalAberto} onClose={fecharReserva} title="Movimentar reserva">
+        <ReservaForm onSaved={onReservaSalva} onCancel={fecharReserva} />
       </Modal>
     </div>
   )

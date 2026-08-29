@@ -35,6 +35,18 @@ export interface Transaction {
   created_at: string
 }
 
+export interface ReservaMovimento {
+  id: string
+  user_id: string
+  tipo: 'deposito' | 'resgate'
+  valor: number
+  descricao: string | null
+  data_lancamento: string
+  competencia_mes: number
+  competencia_ano: number
+  created_at: string
+}
+
 export interface UserSettings {
   user_id: string
   saldo_inicial: number

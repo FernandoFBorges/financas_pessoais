@@ -162,3 +162,36 @@ create policy "user_settings_update_own" on user_settings
 -- =========================================================
 
 alter table transactions drop column if exists pago;
+
+-- =========================================================
+-- Migração — reserva (transferências entre saldo principal e
+-- reserva). Não é despesa nem receita — é dinheiro seu que muda
+-- de lugar, não que entra ou sai de verdade. Rode uma vez no
+-- SQL Editor do Supabase.
+-- =========================================================
+
+create table if not exists reserva_movimentos (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users not null default auth.uid(),
+  tipo text not null check (tipo in ('deposito', 'resgate')),
+  valor numeric(12, 2) not null,
+  descricao text,
+  data_lancamento date not null,
+  competencia_mes int not null check (competencia_mes between 1 and 12),
+  competencia_ano int not null check (competencia_ano between 2000 and 2100),
+  created_at timestamptz default now()
+);
+
+alter table reserva_movimentos enable row level security;
+
+create policy "reserva_movimentos_select_own" on reserva_movimentos
+  for select using (auth.uid() = user_id);
+create policy "reserva_movimentos_insert_own" on reserva_movimentos
+  for insert with check (auth.uid() = user_id);
+create policy "reserva_movimentos_update_own" on reserva_movimentos
+  for update using (auth.uid() = user_id);
+create policy "reserva_movimentos_delete_own" on reserva_movimentos
+  for delete using (auth.uid() = user_id);
+
+create index if not exists idx_reserva_competencia
+  on reserva_movimentos (user_id, competencia_ano, competencia_mes);
