@@ -219,46 +219,48 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="dashboard-bar">
-        <div className="ledger-card dash-card">
-          <span className="total-label">Saldo inicial do mês</span>
-          <span className="total-value mono">{formatBRL(saldoInicialDoMes)}</span>
-        </div>
-        <div className="ledger-card dash-card">
-          <span className="total-label">Receitas</span>
-          <span className="total-value mono dash-receita">{formatBRL(efetivoReceitas)}</span>
-          <span className="dash-card-sub">previsto {formatBRL(previstoReceitas)}</span>
-          <span className={'dash-card-diff ' + (diferencaReceitas >= 0 ? 'diff-favoravel' : 'diff-desfavoravel')}>
-            diferença {formatDiff(diferencaReceitas)}
-          </span>
-        </div>
-        <div className="ledger-card dash-card">
-          <span className="total-label">Despesas</span>
-          <span className="total-value mono dash-despesa">{formatBRL(efetivoDespesas)}</span>
-          <span className="dash-card-sub">previsto {formatBRL(previstoDespesas)}</span>
-          <span className={'dash-card-diff ' + (diferencaDespesas <= 0 ? 'diff-favoravel' : 'diff-desfavoravel')}>
-            diferença {formatDiff(diferencaDespesas)}
-          </span>
-          {pendenteDespesasAnteriores > 0 && (
-            <span className="dash-card-pendente">
-              pendente de meses anteriores: {formatBRL(pendenteDespesasAnteriores)}
+      <div className="dashboard-sticky-header">
+        <div className="dashboard-bar">
+          <div className="ledger-card dash-card">
+            <span className="total-label">Saldo inicial do mês</span>
+            <span className="total-value mono">{formatBRL(saldoInicialDoMes)}</span>
+          </div>
+          <div className="ledger-card dash-card">
+            <span className="total-label">Receitas</span>
+            <span className="total-value mono dash-receita">{formatBRL(efetivoReceitas)}</span>
+            <span className="dash-card-sub">previsto {formatBRL(previstoReceitas)}</span>
+            <span className={'dash-card-diff ' + (diferencaReceitas >= 0 ? 'diff-favoravel' : 'diff-desfavoravel')}>
+              diferença {formatDiff(diferencaReceitas)}
             </span>
-          )}
+          </div>
+          <div className="ledger-card dash-card">
+            <span className="total-label">Despesas</span>
+            <span className="total-value mono dash-despesa">{formatBRL(efetivoDespesas)}</span>
+            <span className="dash-card-sub">previsto {formatBRL(previstoDespesas)}</span>
+            <span className={'dash-card-diff ' + (diferencaDespesas <= 0 ? 'diff-favoravel' : 'diff-desfavoravel')}>
+              diferença {formatDiff(diferencaDespesas)}
+            </span>
+            {pendenteDespesasAnteriores > 0 && (
+              <span className="dash-card-pendente">
+                pendente de meses anteriores: {formatBRL(pendenteDespesasAnteriores)}
+              </span>
+            )}
+          </div>
+          <div className={'stamp ' + (saldoAtual >= 0 ? 'stamp-positivo' : 'stamp-negativo')}>
+            <span className="stamp-title">SALDO ATUAL</span>
+            <span className="stamp-value">{formatBRL(saldoAtual)}</span>
+            <span className="stamp-sub">
+              {diferencaSaldo >= 0 ? '+' : ''}{formatBRL(diferencaSaldo)} vs. saldo inicial do mês
+            </span>
+          </div>
         </div>
-        <div className={'stamp ' + (saldoAtual >= 0 ? 'stamp-positivo' : 'stamp-negativo')}>
-          <span className="stamp-title">SALDO ATUAL</span>
-          <span className="stamp-value">{formatBRL(saldoAtual)}</span>
-          <span className="stamp-sub">
-            {diferencaSaldo >= 0 ? '+' : ''}{formatBRL(diferencaSaldo)} vs. saldo inicial do mês
-          </span>
-        </div>
-      </div>
 
-      <div className="page-toolbar">
-        <button className="btn btn-ghost" onClick={duplicarRecorrentes}>
-          ↻ Duplicar recorrentes
-        </button>
-        <button className="btn btn-primary" onClick={abrirNovo}>+ Novo lançamento</button>
+        <div className="page-toolbar">
+          <button className="btn btn-ghost" onClick={duplicarRecorrentes}>
+            ↻ Duplicar recorrentes
+          </button>
+          <button className="btn btn-primary" onClick={abrirNovo}>+ Novo lançamento</button>
+        </div>
       </div>
 
       {loading ? (

@@ -80,7 +80,7 @@ body {
 .app-shell {
   display: grid;
   grid-template-columns: 200px 1fr;
-  min-height: 100vh;
+  height: 100vh;
 }
 
 .sidebar {
@@ -190,16 +190,21 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  height: 100%;
+  min-height: 0;
 }
 
 .topbar {
   padding: 20px 32px 0;
+  flex-shrink: 0;
 }
 
 .content {
   padding: 20px 32px 48px;
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 /* ---------- Competência tabs ---------- */
@@ -508,6 +513,14 @@ body {
 }
 
 /* ---------- Dashboard summary bar ---------- */
+
+.dashboard-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--color-bg);
+  padding-bottom: 4px;
+}
 
 .dashboard-bar {
   display: grid;
