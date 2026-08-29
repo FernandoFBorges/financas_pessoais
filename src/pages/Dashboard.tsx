@@ -211,6 +211,82 @@ export default function Dashboard() {
     load()
   }
 
+  function somarMeses(m: number, a: number, delta: number) {
+    const totalMeses = (a * 12 + (m - 1)) + delta
+    return { mes: (((totalMeses % 12) + 12) % 12) + 1, ano: Math.floor(totalMeses / 12) }
+  }
+
+  async function antecipar(t: Transaction) {
+    if (!t.grupo_parcelamento_id || !t.parcela_atual || !t.parcela_total) return
+
+    const restantes = t.parcela_total - t.parcela_atual
+    if (restantes <= 0) {
+      alert('Essa já é a última parcela do parcelamento — não há o que antecipar.')
+      return
+    }
+
+    const resposta = prompt(
+      `Parcela atual: ${t.parcela_atual}/${t.parcela_total}.\n\n` +
+        `Quantas parcelas EXTRAS antecipar pra essa mesma competência (além desta)? Máximo ${restantes}.`,
+      '1'
+    )
+    if (resposta === null) return
+
+    const n = Number(resposta)
+    if (!Number.isInteger(n) || n < 1 || n > restantes) {
+      alert(`Valor inválido. Digite um número inteiro entre 1 e ${restantes}.`)
+      return
+    }
+
+    const { data: grupo } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('grupo_parcelamento_id', t.grupo_parcelamento_id)
+      .order('parcela_atual', { ascending: true })
+
+    if (!grupo) return
+
+    const antecipadas = (grupo as Transaction[]).filter(
+      (p) => p.parcela_atual! > t.parcela_atual! && p.parcela_atual! <= t.parcela_atual! + n
+    )
+    const seguintes = (grupo as Transaction[]).filter((p) => p.parcela_atual! > t.parcela_atual! + n)
+
+    const ultimaAntecipada = antecipadas[antecipadas.length - 1]
+    if (
+      !confirm(
+        `Antecipar as parcelas ${t.parcela_atual! + 1} a ${ultimaAntecipada.parcela_atual} pra ${MESES[t.competencia_mes - 1]}/${t.competencia_ano} ` +
+          `(valor efetivo = valor previsto de cada uma)?\n\n` +
+          `As parcelas seguintes (a partir da ${seguintes[0]?.parcela_atual ?? '—'}) recuam ${n} mês(es) no calendário.`
+      )
+    )
+      return
+
+    await Promise.all(
+      antecipadas.map((p) =>
+        supabase
+          .from('transactions')
+          .update({
+            competencia_mes: t.competencia_mes,
+            competencia_ano: t.competencia_ano,
+            valor_efetivo: p.valor,
+          })
+          .eq('id', p.id)
+      )
+    )
+
+    await Promise.all(
+      seguintes.map((p) => {
+        const nova = somarMeses(p.competencia_mes, p.competencia_ano, -n)
+        return supabase
+          .from('transactions')
+          .update({ competencia_mes: nova.mes, competencia_ano: nova.ano })
+          .eq('id', p.id)
+      })
+    )
+
+    load()
+  }
+
   const modalTitulo = modalEditando
     ? 'Editar lançamento'
     : modalPrefill
@@ -279,6 +355,7 @@ export default function Dashboard() {
             onExcluir={excluir}
             onRegistrarPagamentoEmMassa={registrarPagamentoEmMassa}
             onExcluirEmMassa={excluirEmMassa}
+            onAntecipar={antecipar}
           />
           <TransactionColumn
             tipo="receita"
@@ -292,6 +369,7 @@ export default function Dashboard() {
             onExcluir={excluir}
             onRegistrarPagamentoEmMassa={registrarPagamentoEmMassa}
             onExcluirEmMassa={excluirEmMassa}
+            onAntecipar={antecipar}
           />
         </div>
       )}

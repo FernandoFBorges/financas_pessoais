@@ -30,12 +30,13 @@ interface Props {
   onExcluir: (t: Transaction) => void
   onRegistrarPagamentoEmMassa: (ids: string[]) => Promise<void>
   onExcluirEmMassa: (ids: string[]) => Promise<void>
+  onAntecipar: (t: Transaction) => void
 }
 
 export default function TransactionColumn({
   tipo, titulo, items, categories, paymentMethods,
   onDuplicar, onEditar, onSalvarEfetivo, onExcluir,
-  onRegistrarPagamentoEmMassa, onExcluirEmMassa,
+  onRegistrarPagamentoEmMassa, onExcluirEmMassa, onAntecipar,
 }: Props) {
   const [filtroCategoria, setFiltroCategoria] = useState('')
   const [filtroMeio, setFiltroMeio] = useState('')
@@ -445,6 +446,9 @@ export default function TransactionColumn({
                         </td>
                       ))}
                       <td className="col-acoes" data-label="Ações">
+                        {t.grupo_parcelamento_id && (
+                          <button className="icon-btn" onClick={() => onAntecipar(t)} title="Antecipar parcelas seguintes">⏩</button>
+                        )}
                         <button className="icon-btn" onClick={() => onEditar(t)} title="Editar">✎</button>
                         <button className="icon-btn" onClick={() => onDuplicar(t)} title="Duplicar para o próximo mês">⧉</button>
                         <button className="icon-btn icon-btn-danger" onClick={() => onExcluir(t)} title="Excluir">✕</button>
