@@ -13,6 +13,7 @@ export default function Dashboard() {
   const { categories, paymentMethods } = useLookups()
   const [items, setItems] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
+  const [initialLoadDone, setInitialLoadDone] = useState(false)
   const [saldoInicialGeral, setSaldoInicialGeral] = useState(0)
   const [acumuladoAnterior, setAcumuladoAnterior] = useState(0)
   const [pendenteDespesasAnteriores, setPendenteDespesasAnteriores] = useState(0)
@@ -49,6 +50,7 @@ export default function Dashboard() {
       .order('data_lancamento', { ascending: true })
     setItems((data as Transaction[]) ?? [])
     setLoading(false)
+    setInitialLoadDone(true)
   }, [mes, ano])
 
   useEffect(() => {
@@ -491,7 +493,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      {loading ? (
+      {loading && !initialLoadDone ? (
         <p className="empty-state">Carregando…</p>
       ) : (
         <div className="columns-grid" style={gridTemplateVars}>
