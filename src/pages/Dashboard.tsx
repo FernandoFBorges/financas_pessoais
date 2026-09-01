@@ -312,6 +312,24 @@ export default function Dashboard() {
       return
     }
 
+    const totalParcelasPagas = n + 1 // a de referência + as antecipadas
+    const sugestaoTotal = (Number(t.valor) * totalParcelasPagas).toFixed(2).replace('.', ',')
+
+    const respostaValor = prompt(
+      `Você vai pagar ${totalParcelasPagas} parcela(s) de uma vez (a ${t.parcela_atual} + ${n} antecipada(s)).\n\n` +
+        `Qual o valor TOTAL pago? Vou dividir esse valor igualmente entre as ${totalParcelasPagas} parcelas.`,
+      sugestaoTotal
+    )
+    if (respostaValor === null) return
+
+    const valorTotalPago = Number(respostaValor.replace(',', '.'))
+    if (!Number.isFinite(valorTotalPago) || valorTotalPago <= 0) {
+      alert('Valor inválido. Digite um número maior que zero.')
+      return
+    }
+
+    const valorPorParcela = valorTotalPago / totalParcelasPagas
+
     const { data: grupo } = await supabase
       .from('transactions')
       .select('*')
@@ -328,12 +346,19 @@ export default function Dashboard() {
     const ultimaAntecipada = antecipadas[antecipadas.length - 1]
     if (
       !confirm(
-        `Antecipar as parcelas ${t.parcela_atual! + 1} a ${ultimaAntecipada.parcela_atual} pra ${MESES[t.competencia_mes - 1]}/${t.competencia_ano} ` +
-          `(valor efetivo = valor previsto de cada uma)?\n\n` +
+        `Antecipar as parcelas ${t.parcela_atual! + 1} a ${ultimaAntecipada.parcela_atual} pra ${MESES[t.competencia_mes - 1]}/${t.competencia_ano}, ` +
+          `rateando ${formatBRL(valorTotalPago)} em ${totalParcelasPagas} partes de ${formatBRL(valorPorParcela)} ` +
+          `(parcelas ${t.parcela_atual} a ${ultimaAntecipada.parcela_atual})?\n\n` +
           `As parcelas seguintes (a partir da ${seguintes[0]?.parcela_atual ?? '—'}) recuam ${n} mês(es) no calendário.`
       )
     )
       return
+
+    // A própria parcela de referência também entra no rateio.
+    await supabase
+      .from('transactions')
+      .update({ valor_efetivo: valorPorParcela })
+      .eq('id', t.id)
 
     await Promise.all(
       antecipadas.map((p) =>
@@ -342,7 +367,7 @@ export default function Dashboard() {
           .update({
             competencia_mes: t.competencia_mes,
             competencia_ano: t.competencia_ano,
-            valor_efetivo: p.valor,
+            valor_efetivo: valorPorParcela,
           })
           .eq('id', p.id)
       )
