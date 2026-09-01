@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, type DragEvent, type MouseEvent } from 'react'
+import { Fragment, useEffect, useMemo, useState, type DragEvent, type MouseEvent } from 'react'
 import { estaPago, formatBRL, valorEfetivoRealizado, type Category, type PaymentMethod, type Tipo, type Transaction } from '../lib/types'
 
 type Agrupamento = 'nenhum' | 'categoria' | 'meio' | 'pago'
@@ -32,12 +32,15 @@ interface Props {
   onRegistrarPagamentoEmMassa: (ids: string[]) => Promise<void>
   onExcluirEmMassa: (ids: string[]) => Promise<void>
   onAntecipar: (t: Transaction) => void
+  colapsada: boolean
+  onToggleColapsar: () => void
 }
 
 export default function TransactionColumn({
   tipo, titulo, items, categories, paymentMethods,
   onDuplicar, onEditar, onSalvarEfetivo, onExcluir,
   onRegistrarPagamentoEmMassa, onExcluirEmMassa, onAntecipar,
+  colapsada, onToggleColapsar,
 }: Props) {
   const [filtroCategoria, setFiltroCategoria] = useState('')
   const [filtroMeio, setFiltroMeio] = useState('')
@@ -54,6 +57,14 @@ export default function TransactionColumn({
   const [filtroPopoverAberto, setFiltroPopoverAberto] = useState<FiltroPopoverKey>(null)
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
   const [processandoMassa, setProcessandoMassa] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 861px)').matches)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 861px)')
+    const handler = () => setIsDesktop(mq.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   const categoriasDoTipo = categories.filter((c) => c.tipo === tipo)
   const nomeCategoria = (id: string | null) => categories.find((c) => c.id === id)?.nome ?? '—'
@@ -323,86 +334,110 @@ export default function TransactionColumn({
   const nomeFiltroCategoriaAtivo = filtroCategoria ? nomeCategoria(filtroCategoria) : null
   const nomeFiltroMeioAtivo = filtroMeio ? nomeMeio(filtroMeio) : null
 
+  // Setas: despesas encosta na borda esquerda, receitas na direita — a seta de
+  // recolher aponta pra fora (pra borda), a de expandir aponta pra dentro.
+  const setaRecolher = tipo === 'despesa' ? '‹' : '›'
+  const setaExpandir = tipo === 'despesa' ? '›' : '‹'
+
+  if (colapsada && isDesktop) {
+    return (
+      <div className={'ledger-card column-card column-' + tipo + ' column-collapsed-strip'}>
+        <button className="column-expand-btn" onClick={onToggleColapsar} title={`Expandir ${titulo}`}>
+          <span className="column-collapsed-icon">{setaExpandir}</span>
+          <span className="column-collapsed-label">{titulo}</span>
+          <span className="column-collapsed-total mono">{formatBRL(totalEfetivo)}</span>
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className={'ledger-card column-card column-' + tipo} onClick={() => setFiltroPopoverAberto(null)}>
-      <h2 className="form-title">{titulo}</h2>
+      <div className="column-fixed-part">
+        <div className="column-header-row">
+          <h2 className="form-title">{titulo}</h2>
+          <button className="icon-btn column-collapse-btn" onClick={onToggleColapsar} title={`Recolher ${titulo}`}>
+            {setaRecolher}
+          </button>
+        </div>
 
-      <div className="column-total-bar">
-        <span className="column-total-efetivo">{formatBRL(totalEfetivo)}</span>
-        <span className="column-total-previsto">previsto {formatBRL(totalPrevisto)}</span>
-      </div>
+        <div className="column-total-bar">
+          <span className="column-total-efetivo">{formatBRL(totalEfetivo)}</span>
+          <span className="column-total-previsto">previsto {formatBRL(totalPrevisto)}</span>
+        </div>
 
-      {resumoFixoVariavel && (
-        <div className="fixo-variavel-card">
-          <div className="fixo-variavel-header">
-            <span></span>
-            <span>Previsto</span>
-            <span>Pago</span>
-          </div>
-          <div className="fixo-variavel-row">
-            <span>Despesas Fixas</span>
-            <span className="mono">{formatBRL(resumoFixoVariavel.previstoFixas)}</span>
-            <span className="mono">{formatBRL(resumoFixoVariavel.pagoFixas)}</span>
-          </div>
-          <div className="fixo-variavel-row">
-            <span>Despesas Variáveis</span>
-            <span className="mono">{formatBRL(resumoFixoVariavel.previstoVariaveis)}</span>
-            <span className="mono">{formatBRL(resumoFixoVariavel.pagoVariaveis)}</span>
-          </div>
-          <div className="fixo-variavel-row fixo-variavel-total">
-            <span>Total Despesas</span>
-            <span className="mono">{formatBRL(resumoFixoVariavel.totalPrevistoGeral)}</span>
-            <span className="mono">{formatBRL(resumoFixoVariavel.totalPagoGeral)}</span>
-          </div>
-          <div className="fixo-variavel-restante">
-            <span>
-              Restante a pagar
-              <span className="fixo-variavel-pendentes">
-                {resumoFixoVariavel.pendentes === 0
-                  ? ' — 0 pendentes, pode ignorar'
-                  : ` — ${resumoFixoVariavel.pendentes} pendente${resumoFixoVariavel.pendentes > 1 ? 's' : ''}`}
+        {resumoFixoVariavel && (
+          <div className="fixo-variavel-card">
+            <div className="fixo-variavel-header">
+              <span></span>
+              <span>Previsto</span>
+              <span>Pago</span>
+            </div>
+            <div className="fixo-variavel-row">
+              <span>Despesas Fixas</span>
+              <span className="mono">{formatBRL(resumoFixoVariavel.previstoFixas)}</span>
+              <span className="mono">{formatBRL(resumoFixoVariavel.pagoFixas)}</span>
+            </div>
+            <div className="fixo-variavel-row">
+              <span>Despesas Variáveis</span>
+              <span className="mono">{formatBRL(resumoFixoVariavel.previstoVariaveis)}</span>
+              <span className="mono">{formatBRL(resumoFixoVariavel.pagoVariaveis)}</span>
+            </div>
+            <div className="fixo-variavel-row fixo-variavel-total">
+              <span>Total Despesas</span>
+              <span className="mono">{formatBRL(resumoFixoVariavel.totalPrevistoGeral)}</span>
+              <span className="mono">{formatBRL(resumoFixoVariavel.totalPagoGeral)}</span>
+            </div>
+            <div className="fixo-variavel-restante">
+              <span>
+                Restante a pagar
+                <span className="fixo-variavel-pendentes">
+                  {resumoFixoVariavel.pendentes === 0
+                    ? ' — 0 pendentes, pode ignorar'
+                    : ` — ${resumoFixoVariavel.pendentes} pendente${resumoFixoVariavel.pendentes > 1 ? 's' : ''}`}
+                </span>
               </span>
-            </span>
-            <span className="mono">{formatBRL(resumoFixoVariavel.restante)}</span>
+              <span className="mono">{formatBRL(resumoFixoVariavel.restante)}</span>
+            </div>
+          </div>
+        )}
+
+        <div className="column-toolbar">
+          <button type="button" className="link-btn selecao-inverter-btn" onClick={inverterSelecao}>
+            Inverter seleção
+          </button>
+          <div className="column-toolbar-selects">
+            <select value={filtroPago} onChange={(e) => setFiltroPago(e.target.value as FiltroPago)}>
+              <option value="todos">Pago e pendente</option>
+              <option value="pago">Só pagos</option>
+              <option value="pendente">Só pendentes</option>
+            </select>
+            <select value={agrupamento} onChange={(e) => setAgrupamento(e.target.value as Agrupamento)}>
+              <option value="nenhum">Sem agrupamento</option>
+              <option value="categoria">Agrupar por categoria</option>
+              <option value="meio">Agrupar por meio</option>
+              <option value="pago">Agrupar por status</option>
+            </select>
           </div>
         </div>
-      )}
 
-      <div className="column-toolbar">
-        <button type="button" className="link-btn selecao-inverter-btn" onClick={inverterSelecao}>
-          Inverter seleção
-        </button>
-        <div className="column-toolbar-selects">
-          <select value={filtroPago} onChange={(e) => setFiltroPago(e.target.value as FiltroPago)}>
-            <option value="todos">Pago e pendente</option>
-            <option value="pago">Só pagos</option>
-            <option value="pendente">Só pendentes</option>
-          </select>
-          <select value={agrupamento} onChange={(e) => setAgrupamento(e.target.value as Agrupamento)}>
-            <option value="nenhum">Sem agrupamento</option>
-            <option value="categoria">Agrupar por categoria</option>
-            <option value="meio">Agrupar por meio</option>
-            <option value="pago">Agrupar por status</option>
-          </select>
-        </div>
+        {selecionados.size > 0 && (
+          <div className="selecao-bar">
+            <span>{selecionados.size} selecionado(s)</span>
+            <button className="btn btn-primary btn-sm" onClick={registrarPagamentoSelecionados} disabled={processandoMassa}>
+              Registrar pagamento
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={excluirSelecionados} disabled={processandoMassa}>
+              Excluir
+            </button>
+          </div>
+        )}
       </div>
-
-      {selecionados.size > 0 && (
-        <div className="selecao-bar">
-          <span>{selecionados.size} selecionado(s)</span>
-          <button className="btn btn-primary btn-sm" onClick={registrarPagamentoSelecionados} disabled={processandoMassa}>
-            Registrar pagamento
-          </button>
-          <button className="btn btn-ghost btn-sm" onClick={excluirSelecionados} disabled={processandoMassa}>
-            Excluir
-          </button>
-        </div>
-      )}
 
       {filtrados.length === 0 ? (
         <p className="empty-state">Nada por aqui com esse filtro.</p>
       ) : (
-        <div className="grid-scroll">
+        <div className="column-scroll-area">
           <table className="grid-table">
             <thead>
               <tr>

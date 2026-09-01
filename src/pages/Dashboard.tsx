@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { supabase } from '../lib/supabase'
 import { useCompetencia } from '../context/CompetenciaContext'
 import { useLookups } from '../lib/useLookups'
@@ -23,6 +23,21 @@ export default function Dashboard() {
   const [reservaItems, setReservaItems] = useState<ReservaMovimento[]>([])
   const [reservaAcumuladaAnterior, setReservaAcumuladaAnterior] = useState(0)
   const [reservaModalAberto, setReservaModalAberto] = useState(false)
+  const [despesasColapsada, setDespesasColapsada] = useState(() => localStorage.getItem('despesasColapsada') === '1')
+  const [receitasColapsada, setReceitasColapsada] = useState(() => localStorage.getItem('receitasColapsada') === '1')
+  const [painelColapsado, setPainelColapsado] = useState(() => localStorage.getItem('painelColapsado') === '1')
+
+  useEffect(() => {
+    localStorage.setItem('despesasColapsada', despesasColapsada ? '1' : '0')
+  }, [despesasColapsada])
+
+  useEffect(() => {
+    localStorage.setItem('receitasColapsada', receitasColapsada ? '1' : '0')
+  }, [receitasColapsada])
+
+  useEffect(() => {
+    localStorage.setItem('painelColapsado', painelColapsado ? '1' : '0')
+  }, [painelColapsado])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -352,52 +367,78 @@ export default function Dashboard() {
     ? 'Duplicar lançamento'
     : 'Novo lançamento'
 
+  const gridTemplateVars = {
+    '--col-despesas': despesasColapsada ? '56px' : '1fr',
+    '--col-receitas': receitasColapsada ? '56px' : '1fr',
+  } as CSSProperties
+
   return (
-    <div>
-      <div className="dashboard-sticky-header">
-        <div className="dashboard-bar">
-          <div className="ledger-card dash-card">
-            <span className="total-label">Saldo inicial do mês</span>
-            <span className="total-value mono">{formatBRL(saldoInicialDoMes)}</span>
-          </div>
-          <div className="ledger-card dash-card">
-            <span className="total-label">Receitas</span>
-            <span className="total-value mono dash-receita">{formatBRL(efetivoReceitas)}</span>
-            <span className="dash-card-sub">previsto {formatBRL(previstoReceitas)}</span>
-            <span className={'dash-card-diff ' + (diferencaReceitas >= 0 ? 'diff-favoravel' : 'diff-desfavoravel')}>
-              diferença {formatDiff(diferencaReceitas)}
-            </span>
-          </div>
-          <div className="ledger-card dash-card">
-            <span className="total-label">Despesas</span>
-            <span className="total-value mono dash-despesa">{formatBRL(efetivoDespesas)}</span>
-            <span className="dash-card-sub">previsto {formatBRL(previstoDespesas)}</span>
-            <span className={'dash-card-diff ' + (diferencaDespesas <= 0 ? 'diff-favoravel' : 'diff-desfavoravel')}>
-              diferença {formatDiff(diferencaDespesas)}
-            </span>
-            {pendenteDespesasAnteriores > 0 && (
-              <span className="dash-card-pendente">
-                pendente de meses anteriores: {formatBRL(pendenteDespesasAnteriores)}
-              </span>
-            )}
-          </div>
-          <div className="ledger-card dash-card">
-            <span className="total-label">Reserva</span>
-            <span className="total-value mono dash-reserva">{formatBRL(reservaAtual)}</span>
-            {netReservaMes !== 0 && (
-              <span className="dash-card-sub">
-                {netReservaMes >= 0 ? '+' : ''}{formatBRL(netReservaMes)} este mês
-              </span>
-            )}
-          </div>
-          <div className={'stamp ' + (saldoAtual >= 0 ? 'stamp-positivo' : 'stamp-negativo')}>
-            <span className="stamp-title">SALDO ATUAL</span>
-            <span className="stamp-value">{formatBRL(saldoAtual)}</span>
-            <span className="stamp-sub">
-              {diferencaSaldo >= 0 ? '+' : ''}{formatBRL(diferencaSaldo)} vs. saldo inicial do mês
-            </span>
-          </div>
+    <div className="dashboard-page">
+      <div className="dashboard-header-zone">
+        <div className="dashboard-header-toggle-row">
+          <button
+            className="link-btn dashboard-collapse-toggle"
+            onClick={() => setPainelColapsado((c) => !c)}
+          >
+            {painelColapsado ? '▾ Mostrar resumo' : '▴ Recolher resumo'}
+          </button>
         </div>
+
+        {painelColapsado ? (
+          <div className="dashboard-bar-compact">
+            <span>Saldo inicial: <strong className="mono">{formatBRL(saldoInicialDoMes)}</strong></span>
+            <span className="dash-receita">Receitas: <strong className="mono">{formatBRL(efetivoReceitas)}</strong></span>
+            <span className="dash-despesa">Despesas: <strong className="mono">{formatBRL(efetivoDespesas)}</strong></span>
+            <span className="dash-reserva">Reserva: <strong className="mono">{formatBRL(reservaAtual)}</strong></span>
+            <span className={saldoAtual >= 0 ? 'diff-favoravel' : 'diff-desfavoravel'}>
+              Saldo atual: <strong className="mono">{formatBRL(saldoAtual)}</strong>
+            </span>
+          </div>
+        ) : (
+          <div className="dashboard-bar">
+            <div className="ledger-card dash-card">
+              <span className="total-label">Saldo inicial do mês</span>
+              <span className="total-value mono">{formatBRL(saldoInicialDoMes)}</span>
+            </div>
+            <div className="ledger-card dash-card">
+              <span className="total-label">Receitas</span>
+              <span className="total-value mono dash-receita">{formatBRL(efetivoReceitas)}</span>
+              <span className="dash-card-sub">previsto {formatBRL(previstoReceitas)}</span>
+              <span className={'dash-card-diff ' + (diferencaReceitas >= 0 ? 'diff-favoravel' : 'diff-desfavoravel')}>
+                diferença {formatDiff(diferencaReceitas)}
+              </span>
+            </div>
+            <div className="ledger-card dash-card">
+              <span className="total-label">Despesas</span>
+              <span className="total-value mono dash-despesa">{formatBRL(efetivoDespesas)}</span>
+              <span className="dash-card-sub">previsto {formatBRL(previstoDespesas)}</span>
+              <span className={'dash-card-diff ' + (diferencaDespesas <= 0 ? 'diff-favoravel' : 'diff-desfavoravel')}>
+                diferença {formatDiff(diferencaDespesas)}
+              </span>
+              {pendenteDespesasAnteriores > 0 && (
+                <span className="dash-card-pendente">
+                  pendente de meses anteriores: {formatBRL(pendenteDespesasAnteriores)}
+                </span>
+              )}
+            </div>
+            <div className="ledger-card dash-card">
+              <span className="total-label">Reserva</span>
+              <span className="total-value mono dash-reserva">{formatBRL(reservaAtual)}</span>
+              {netReservaMes !== 0 && (
+                <span className="dash-card-sub">
+                  {netReservaMes >= 0 ? '+' : ''}{formatBRL(netReservaMes)} este mês
+                </span>
+              )}
+            </div>
+            <div className={'stamp ' + (saldoAtual >= 0 ? 'stamp-positivo' : 'stamp-negativo')}>
+              <span className="stamp-title">SALDO ATUAL</span>
+              <span className="stamp-value">{formatBRL(saldoAtual)}</span>
+              <span className="stamp-sub">
+                {diferencaSaldo >= 0 ? '+' : ''}{formatBRL(diferencaSaldo)} vs. saldo inicial do mês
+              </span>
+            </div>
+          </div>
+        )}
 
         <div className="page-toolbar">
           <button className="btn btn-ghost" onClick={duplicarRecorrentes}>
@@ -428,7 +469,7 @@ export default function Dashboard() {
       {loading ? (
         <p className="empty-state">Carregando…</p>
       ) : (
-        <div className="columns-grid">
+        <div className="columns-grid" style={gridTemplateVars}>
           <TransactionColumn
             tipo="despesa"
             titulo="Despesas"
@@ -442,6 +483,8 @@ export default function Dashboard() {
             onRegistrarPagamentoEmMassa={registrarPagamentoEmMassa}
             onExcluirEmMassa={excluirEmMassa}
             onAntecipar={antecipar}
+            colapsada={despesasColapsada}
+            onToggleColapsar={() => setDespesasColapsada((c) => !c)}
           />
           <TransactionColumn
             tipo="receita"
@@ -456,6 +499,8 @@ export default function Dashboard() {
             onRegistrarPagamentoEmMassa={registrarPagamentoEmMassa}
             onExcluirEmMassa={excluirEmMassa}
             onAntecipar={antecipar}
+            colapsada={receitasColapsada}
+            onToggleColapsar={() => setReceitasColapsada((c) => !c)}
           />
         </div>
       )}

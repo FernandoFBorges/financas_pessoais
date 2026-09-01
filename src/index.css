@@ -580,14 +580,46 @@ body {
   color: #fff;
 }
 
-/* ---------- Dashboard summary bar ---------- */
+/* ---------- Dashboard page: cabeçalho fixo, só as colunas rolam ---------- */
 
-.dashboard-sticky-header {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  background: var(--color-bg);
-  padding-bottom: 4px;
+.dashboard-page {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-header-zone {
+  flex-shrink: 0;
+}
+
+.dashboard-header-toggle-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 6px;
+}
+
+.dashboard-collapse-toggle {
+  font-weight: 600;
+  font-size: 12.5px;
+}
+
+.dashboard-bar-compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  align-items: baseline;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--color-ink-soft);
+}
+
+.dashboard-bar-compact strong {
+  color: var(--color-ink);
 }
 
 .dashboard-bar {
@@ -700,14 +732,88 @@ body {
 
 .columns-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: var(--col-despesas, 1fr) var(--col-receitas, 1fr);
   gap: 20px;
-  align-items: start;
+  flex: 1;
+  min-height: 0;
+  transition: grid-template-columns 0.15s ease;
 }
 
 .column-card {
   min-width: 0;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
+
+.column-fixed-part {
+  flex-shrink: 0;
+}
+
+.column-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.column-collapse-btn {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.column-collapsed-strip {
+  width: 56px;
+  min-width: 56px;
+  padding: 0;
+  display: flex;
+}
+
+.column-expand-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14px;
+  padding: 18px 0;
+  color: var(--color-ink);
+}
+
+.column-expand-btn:hover {
+  background: var(--color-surface-alt);
+}
+
+.column-collapsed-icon {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-ink-soft);
+}
+
+.column-collapsed-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+.column-collapsed-total {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.column-despesa .column-collapsed-total { color: var(--color-despesa); }
+.column-receita .column-collapsed-total { color: var(--color-receita); }
 
 .page-toolbar {
   display: flex;
@@ -918,8 +1024,10 @@ body {
 
 /* ---------- Grid table ---------- */
 
-.grid-scroll {
-  overflow-x: auto;
+.column-scroll-area {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .grid-table {
@@ -940,6 +1048,10 @@ body {
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--color-surface);
 }
 
 .grid-th-inner {
@@ -955,6 +1067,17 @@ body {
 .grid-th-wrap {
   white-space: normal;
   vertical-align: bottom;
+}
+
+.grid-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--color-surface);
+}
+
+.grid-table thead th.col-check {
+  z-index: 5;
 }
 
 .grid-th-wrap .grid-th-inner {
@@ -1025,11 +1148,6 @@ body {
   text-align: center;
   width: 1%;
   white-space: nowrap;
-  position: sticky;
-  right: 0;
-  z-index: 2;
-  background: var(--color-surface);
-  box-shadow: -6px 0 8px -6px rgba(0, 0, 0, 0.15);
 }
 
 .tx-valor-pago {
@@ -1377,10 +1495,26 @@ body {
   .field-row {
     flex-direction: column;
   }
+  .dashboard-page {
+    height: auto;
+  }
+  .columns-grid {
+    flex: none;
+  }
+  .column-card {
+    height: auto;
+    overflow: visible;
+  }
+  .column-scroll-area {
+    overflow: visible;
+  }
+  .column-collapse-btn {
+    display: none;
+  }
 }
 
 @media (max-width: 700px) {
-  .grid-scroll {
+  .column-scroll-area {
     overflow-x: visible;
   }
 
