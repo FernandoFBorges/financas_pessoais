@@ -701,6 +701,56 @@ body {
   font-weight: 500;
 }
 
+/* ---------- Resumo Fixas x Variáveis (só despesas) ---------- */
+
+.fixo-variavel-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  background: var(--color-surface-alt);
+}
+
+.fixo-variavel-header,
+.fixo-variavel-row {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  gap: 8px;
+  font-size: 12px;
+  padding: 3px 0;
+}
+
+.fixo-variavel-header {
+  color: var(--color-ink-soft);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+}
+
+.fixo-variavel-header span:not(:first-child),
+.fixo-variavel-row span:not(:first-child) {
+  text-align: right;
+}
+
+.fixo-variavel-total {
+  border-top: 1px solid var(--color-border);
+  margin-top: 4px;
+  padding-top: 6px;
+  font-weight: 700;
+}
+
+.fixo-variavel-restante {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border);
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--color-despesa);
+}
+
 .column-toolbar {
   display: flex;
   justify-content: space-between;

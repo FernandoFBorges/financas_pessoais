@@ -3,7 +3,7 @@ import { estaPago, formatBRL, valorEfetivoRealizado, type Category, type Payment
 
 type Agrupamento = 'nenhum' | 'categoria' | 'meio' | 'pago'
 type FiltroPago = 'todos' | 'pago' | 'pendente'
-type ColKey = 'descricao' | 'categoria' | 'meio' | 'data' | 'previsto' | 'efetivo'
+type ColKey = 'descricao' | 'categoria' | 'meio' | 'data' | 'criado' | 'previsto' | 'efetivo'
 type SortDir = 'asc' | 'desc'
 type FiltroPopoverKey = 'categoria' | 'meio' | null
 
@@ -12,11 +12,12 @@ const COLUMN_LABELS: Record<ColKey, string> = {
   categoria: 'Categoria',
   meio: 'Meio de pagamento',
   data: 'Data de lançamento',
+  criado: 'Registrado em',
   previsto: 'Vlr. previsto',
   efetivo: 'Vlr. efetivo',
 }
 
-const DEFAULT_ORDER: ColKey[] = ['descricao', 'categoria', 'meio', 'data', 'previsto', 'efetivo']
+const DEFAULT_ORDER: ColKey[] = ['descricao', 'categoria', 'meio', 'data', 'criado', 'previsto', 'efetivo']
 
 interface Props {
   tipo: Tipo
@@ -68,6 +69,31 @@ export default function TransactionColumn({
 
   const totalPrevisto = filtrados.reduce((s, t) => s + Number(t.valor), 0)
   const totalEfetivo = filtrados.reduce((s, t) => s + valorEfetivoRealizado(t), 0)
+
+  // Fixas x variáveis — só faz sentido pra despesas. Usa "items" (não "filtrados")
+  // de propósito: é uma foto fixa, igual não importa o filtro ativo na grade.
+  const resumoFixoVariavel =
+    tipo === 'despesa'
+      ? (() => {
+          const fixas = items.filter((t) => t.recorrente || t.grupo_parcelamento_id != null)
+          const variaveis = items.filter((t) => !t.recorrente && !t.grupo_parcelamento_id)
+          const previstoFixas = fixas.reduce((s, t) => s + Number(t.valor), 0)
+          const pagoFixas = fixas.reduce((s, t) => s + valorEfetivoRealizado(t), 0)
+          const previstoVariaveis = variaveis.reduce((s, t) => s + Number(t.valor), 0)
+          const pagoVariaveis = variaveis.reduce((s, t) => s + valorEfetivoRealizado(t), 0)
+          const totalPrevistoGeral = previstoFixas + previstoVariaveis
+          const totalPagoGeral = pagoFixas + pagoVariaveis
+          return {
+            previstoFixas,
+            pagoFixas,
+            previstoVariaveis,
+            pagoVariaveis,
+            totalPrevistoGeral,
+            totalPagoGeral,
+            restante: totalPrevistoGeral - totalPagoGeral,
+          }
+        })()
+      : null
 
   function toggleSelecionado(id: string) {
     setSelecionados((prev) => {
@@ -141,6 +167,7 @@ export default function TransactionColumn({
       case 'categoria': return nomeCategoria(t.categoria_id).toLowerCase()
       case 'meio': return nomeMeio(t.meio_pagamento_id).toLowerCase()
       case 'data': return t.data_lancamento
+      case 'criado': return t.created_at
       case 'previsto': return Number(t.valor)
       case 'efetivo': return valorEfetivoRealizado(t)
     }
@@ -282,6 +309,10 @@ export default function TransactionColumn({
       case 'categoria': return nomeCategoria(t.categoria_id)
       case 'meio': return nomeMeio(t.meio_pagamento_id)
       case 'data': return new Date(t.data_lancamento + 'T00:00:00').toLocaleDateString('pt-BR')
+      case 'criado': {
+        const d = new Date(t.created_at)
+        return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+      }
       case 'previsto': return renderValorCelula(t, 'previsto')
       case 'efetivo': return renderValorCelula(t, 'efetivo')
     }
@@ -298,6 +329,35 @@ export default function TransactionColumn({
         <span className="column-total-efetivo">{formatBRL(totalEfetivo)}</span>
         <span className="column-total-previsto">previsto {formatBRL(totalPrevisto)}</span>
       </div>
+
+      {resumoFixoVariavel && (
+        <div className="fixo-variavel-card">
+          <div className="fixo-variavel-header">
+            <span></span>
+            <span>Previsto</span>
+            <span>Pago</span>
+          </div>
+          <div className="fixo-variavel-row">
+            <span>Despesas Fixas</span>
+            <span className="mono">{formatBRL(resumoFixoVariavel.previstoFixas)}</span>
+            <span className="mono">{formatBRL(resumoFixoVariavel.pagoFixas)}</span>
+          </div>
+          <div className="fixo-variavel-row">
+            <span>Despesas Variáveis</span>
+            <span className="mono">{formatBRL(resumoFixoVariavel.previstoVariaveis)}</span>
+            <span className="mono">{formatBRL(resumoFixoVariavel.pagoVariaveis)}</span>
+          </div>
+          <div className="fixo-variavel-row fixo-variavel-total">
+            <span>Total Despesas</span>
+            <span className="mono">{formatBRL(resumoFixoVariavel.totalPrevistoGeral)}</span>
+            <span className="mono">{formatBRL(resumoFixoVariavel.totalPagoGeral)}</span>
+          </div>
+          <div className="fixo-variavel-restante">
+            <span>Restante a pagar</span>
+            <span className="mono">{formatBRL(resumoFixoVariavel.restante)}</span>
+          </div>
+        </div>
+      )}
 
       <div className="column-toolbar">
         <button type="button" className="link-btn selecao-inverter-btn" onClick={inverterSelecao}>
@@ -355,7 +415,7 @@ export default function TransactionColumn({
                     className={
                       'grid-th' +
                       (key === 'previsto' || key === 'efetivo' ? ' col-valor' : '') +
-                      (key === 'meio' || key === 'data' ? ' grid-th-wrap' : '')
+                      (key === 'meio' || key === 'data' || key === 'criado' ? ' grid-th-wrap' : '')
                     }
                   >
                     <span className="grid-th-inner">
