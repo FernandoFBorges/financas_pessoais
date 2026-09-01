@@ -781,6 +781,10 @@ body {
   width: 1%;
   text-align: center;
   padding: 6px 6px !important;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--color-surface);
 }
 
 .selecao-bar {
@@ -953,6 +957,11 @@ body {
   text-align: center;
   width: 1%;
   white-space: nowrap;
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  background: var(--color-surface);
+  box-shadow: -6px 0 8px -6px rgba(0, 0, 0, 0.15);
 }
 
 .tx-valor-pago {
