@@ -743,12 +743,19 @@ body {
 .fixo-variavel-restante {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   margin-top: 6px;
   padding-top: 6px;
   border-top: 1px solid var(--color-border);
   font-weight: 800;
   font-size: 13px;
   color: var(--color-despesa);
+}
+
+.fixo-variavel-pendentes {
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--color-ink-soft);
 }
 
 .column-toolbar {

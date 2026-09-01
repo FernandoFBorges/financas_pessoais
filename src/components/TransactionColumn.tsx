@@ -83,6 +83,7 @@ export default function TransactionColumn({
           const pagoVariaveis = variaveis.reduce((s, t) => s + valorEfetivoRealizado(t), 0)
           const totalPrevistoGeral = previstoFixas + previstoVariaveis
           const totalPagoGeral = pagoFixas + pagoVariaveis
+          const pendentes = items.filter((t) => !estaPago(t)).length
           return {
             previstoFixas,
             pagoFixas,
@@ -91,6 +92,7 @@ export default function TransactionColumn({
             totalPrevistoGeral,
             totalPagoGeral,
             restante: totalPrevistoGeral - totalPagoGeral,
+            pendentes,
           }
         })()
       : null
@@ -353,7 +355,14 @@ export default function TransactionColumn({
             <span className="mono">{formatBRL(resumoFixoVariavel.totalPagoGeral)}</span>
           </div>
           <div className="fixo-variavel-restante">
-            <span>Restante a pagar</span>
+            <span>
+              Restante a pagar
+              <span className="fixo-variavel-pendentes">
+                {resumoFixoVariavel.pendentes === 0
+                  ? ' — 0 pendentes, pode ignorar'
+                  : ` — ${resumoFixoVariavel.pendentes} pendente${resumoFixoVariavel.pendentes > 1 ? 's' : ''}`}
+              </span>
+            </span>
             <span className="mono">{formatBRL(resumoFixoVariavel.restante)}</span>
           </div>
         </div>
