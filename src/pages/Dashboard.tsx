@@ -84,18 +84,44 @@ export default function Dashboard() {
     carregarSaldoInicial()
   }, [])
 
+  // O Supabase limita a 1000 linhas por consulta por padrão — sem paginar, contas
+  // que somam "tudo antes desse mês" ficam incompletas assim que o histórico cresce
+  // além disso. Essa função busca em blocos até esgotar os resultados.
+  async function buscarTudoAntesDe(
+    tabela: 'transactions' | 'reserva_movimentos',
+    colunas: string,
+    ano: number,
+    mes: number
+  ) {
+    const TAMANHO_PAGINA = 1000
+    let inicio = 0
+    let todasLinhas: Record<string, unknown>[] = []
+
+    while (true) {
+      const { data, error } = await supabase
+        .from(tabela)
+        .select(colunas)
+        .or(`competencia_ano.lt.${ano},and(competencia_ano.eq.${ano},competencia_mes.lt.${mes})`)
+        .range(inicio, inicio + TAMANHO_PAGINA - 1)
+
+      if (error || !data || data.length === 0) break
+      todasLinhas = todasLinhas.concat(data as unknown as Record<string, unknown>[])
+      if (data.length < TAMANHO_PAGINA) break
+      inicio += TAMANHO_PAGINA
+    }
+
+    return todasLinhas
+  }
+
   // Soma efetiva (receita - despesa) de todas as competências ANTERIORES à selecionada,
   // pra saber quanto já tinha acumulado ao entrar no mês atual — e, de quebra, quanto
   // de despesa de meses passados ainda ficou pendente (sem valor efetivo lançado), e
   // quanto já tinha ido pra reserva antes deste mês.
   useEffect(() => {
     async function carregarAcumulado() {
-      const { data } = await supabase
-        .from('transactions')
-        .select('tipo, valor, valor_efetivo')
-        .or(`competencia_ano.lt.${ano},and(competencia_ano.eq.${ano},competencia_mes.lt.${mes})`)
+      const data = await buscarTudoAntesDe('transactions', 'tipo, valor, valor_efetivo', ano, mes)
 
-      const linhas = (data ?? []) as { tipo: string; valor: number; valor_efetivo: number | null }[]
+      const linhas = data as unknown as { tipo: string; valor: number; valor_efetivo: number | null }[]
       const soma = linhas.reduce((acc, t) => {
         const efetivo = valorEfetivoRealizado(t)
         return acc + (t.tipo === 'receita' ? efetivo : -efetivo)
@@ -107,12 +133,9 @@ export default function Dashboard() {
         .reduce((acc, t) => acc + Number(t.valor), 0)
       setPendenteDespesasAnteriores(pendente)
 
-      const { data: reservaAnterior } = await supabase
-        .from('reserva_movimentos')
-        .select('tipo, valor')
-        .or(`competencia_ano.lt.${ano},and(competencia_ano.eq.${ano},competencia_mes.lt.${mes})`)
+      const reservaAnterior = await buscarTudoAntesDe('reserva_movimentos', 'tipo, valor', ano, mes)
 
-      const linhasReserva = (reservaAnterior ?? []) as { tipo: string; valor: number }[]
+      const linhasReserva = reservaAnterior as unknown as { tipo: string; valor: number }[]
       const netReserva = linhasReserva.reduce(
         (acc, r) => acc + (r.tipo === 'deposito' ? Number(r.valor) : -Number(r.valor)),
         0
