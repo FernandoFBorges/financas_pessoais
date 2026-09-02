@@ -69,13 +69,13 @@ export default function ReservaForm({ onSaved, onCancel }: Props) {
       </div>
 
       <label className="field">
-        <span>Valor (R$)</span>
-        <input required inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" autoFocus />
+        <span>Descrição (opcional)</span>
+        <input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Ex: Reserva de emergência" autoFocus />
       </label>
 
       <label className="field">
-        <span>Descrição (opcional)</span>
-        <input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Ex: Reserva de emergência" />
+        <span>Valor (R$)</span>
+        <input required inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" />
       </label>
 
       <div className="field-row">
