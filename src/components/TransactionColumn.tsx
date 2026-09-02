@@ -58,6 +58,13 @@ export default function TransactionColumn({
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
   const [processandoMassa, setProcessandoMassa] = useState(false)
   const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 861px)').matches)
+  const [cabecalhoRecolhido, setCabecalhoRecolhido] = useState(
+    () => localStorage.getItem(`cabecalho-${tipo}-recolhido`) === '1'
+  )
+
+  useEffect(() => {
+    localStorage.setItem(`cabecalho-${tipo}-recolhido`, cabecalhoRecolhido ? '1' : '0')
+  }, [tipo, cabecalhoRecolhido])
 
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 861px)')
@@ -356,9 +363,18 @@ export default function TransactionColumn({
       <div className="column-fixed-part">
         <div className="column-header-row">
           <h2 className="form-title">{titulo}</h2>
-          <button className="icon-btn column-collapse-btn" onClick={onToggleColapsar} title={`Recolher ${titulo}`}>
-            {setaRecolher}
-          </button>
+          <div className="column-header-actions">
+            <button
+              className="icon-btn column-header-toggle-btn"
+              onClick={() => setCabecalhoRecolhido((c) => !c)}
+              title={cabecalhoRecolhido ? 'Expandir cabeçalho' : 'Recolher cabeçalho'}
+            >
+              {cabecalhoRecolhido ? '▾' : '▴'}
+            </button>
+            <button className="icon-btn column-collapse-btn" onClick={onToggleColapsar} title={`Recolher ${titulo}`}>
+              {setaRecolher}
+            </button>
+          </div>
         </div>
 
         <div className="column-total-bar">
@@ -366,60 +382,64 @@ export default function TransactionColumn({
           <span className="column-total-previsto">previsto {formatBRL(totalPrevisto)}</span>
         </div>
 
-        {resumoFixoVariavel && (
-          <div className="fixo-variavel-card">
-            <div className="fixo-variavel-header">
-              <span></span>
-              <span>Previsto</span>
-              <span>Pago</span>
-            </div>
-            <div className="fixo-variavel-row">
-              <span>Despesas Fixas</span>
-              <span className="mono">{formatBRL(resumoFixoVariavel.previstoFixas)}</span>
-              <span className="mono">{formatBRL(resumoFixoVariavel.pagoFixas)}</span>
-            </div>
-            <div className="fixo-variavel-row">
-              <span>Despesas Variáveis</span>
-              <span className="mono">{formatBRL(resumoFixoVariavel.previstoVariaveis)}</span>
-              <span className="mono">{formatBRL(resumoFixoVariavel.pagoVariaveis)}</span>
-            </div>
-            <div className="fixo-variavel-row fixo-variavel-total">
-              <span>Total Despesas</span>
-              <span className="mono">{formatBRL(resumoFixoVariavel.totalPrevistoGeral)}</span>
-              <span className="mono">{formatBRL(resumoFixoVariavel.totalPagoGeral)}</span>
-            </div>
-            <div className="fixo-variavel-restante">
-              <span>
-                Restante a pagar
-                <span className="fixo-variavel-pendentes">
-                  {resumoFixoVariavel.pendentes === 0
-                    ? ' — 0 pendentes, pode ignorar'
-                    : ` — ${resumoFixoVariavel.pendentes} pendente${resumoFixoVariavel.pendentes > 1 ? 's' : ''}`}
-                </span>
-              </span>
-              <span className="mono">{formatBRL(resumoFixoVariavel.restante)}</span>
-            </div>
-          </div>
-        )}
+        {!cabecalhoRecolhido && (
+          <>
+            {resumoFixoVariavel && (
+              <div className="fixo-variavel-card">
+                <div className="fixo-variavel-header">
+                  <span></span>
+                  <span>Previsto</span>
+                  <span>Pago</span>
+                </div>
+                <div className="fixo-variavel-row">
+                  <span>Despesas Fixas</span>
+                  <span className="mono">{formatBRL(resumoFixoVariavel.previstoFixas)}</span>
+                  <span className="mono">{formatBRL(resumoFixoVariavel.pagoFixas)}</span>
+                </div>
+                <div className="fixo-variavel-row">
+                  <span>Despesas Variáveis</span>
+                  <span className="mono">{formatBRL(resumoFixoVariavel.previstoVariaveis)}</span>
+                  <span className="mono">{formatBRL(resumoFixoVariavel.pagoVariaveis)}</span>
+                </div>
+                <div className="fixo-variavel-row fixo-variavel-total">
+                  <span>Total Despesas</span>
+                  <span className="mono">{formatBRL(resumoFixoVariavel.totalPrevistoGeral)}</span>
+                  <span className="mono">{formatBRL(resumoFixoVariavel.totalPagoGeral)}</span>
+                </div>
+                <div className="fixo-variavel-restante">
+                  <span>
+                    Restante a pagar
+                    <span className="fixo-variavel-pendentes">
+                      {resumoFixoVariavel.pendentes === 0
+                        ? ' — 0 pendentes, pode ignorar'
+                        : ` — ${resumoFixoVariavel.pendentes} pendente${resumoFixoVariavel.pendentes > 1 ? 's' : ''}`}
+                    </span>
+                  </span>
+                  <span className="mono">{formatBRL(resumoFixoVariavel.restante)}</span>
+                </div>
+              </div>
+            )}
 
-        <div className="column-toolbar">
-          <button type="button" className="link-btn selecao-inverter-btn" onClick={inverterSelecao}>
-            Inverter seleção
-          </button>
-          <div className="column-toolbar-selects">
-            <select value={filtroPago} onChange={(e) => setFiltroPago(e.target.value as FiltroPago)}>
-              <option value="todos">Pago e pendente</option>
-              <option value="pago">Só pagos</option>
-              <option value="pendente">Só pendentes</option>
-            </select>
-            <select value={agrupamento} onChange={(e) => setAgrupamento(e.target.value as Agrupamento)}>
-              <option value="nenhum">Sem agrupamento</option>
-              <option value="categoria">Agrupar por categoria</option>
-              <option value="meio">Agrupar por meio</option>
-              <option value="pago">Agrupar por status</option>
-            </select>
-          </div>
-        </div>
+            <div className="column-toolbar">
+              <button type="button" className="link-btn selecao-inverter-btn" onClick={inverterSelecao}>
+                Inverter seleção
+              </button>
+              <div className="column-toolbar-selects">
+                <select value={filtroPago} onChange={(e) => setFiltroPago(e.target.value as FiltroPago)}>
+                  <option value="todos">Pago e pendente</option>
+                  <option value="pago">Só pagos</option>
+                  <option value="pendente">Só pendentes</option>
+                </select>
+                <select value={agrupamento} onChange={(e) => setAgrupamento(e.target.value as Agrupamento)}>
+                  <option value="nenhum">Sem agrupamento</option>
+                  <option value="categoria">Agrupar por categoria</option>
+                  <option value="meio">Agrupar por meio</option>
+                  <option value="pago">Agrupar por status</option>
+                </select>
+              </div>
+            </div>
+          </>
+        )}
 
         {selecionados.size > 0 && (
           <div className="selecao-bar">

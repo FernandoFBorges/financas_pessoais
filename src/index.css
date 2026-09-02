@@ -759,6 +759,17 @@ body {
   gap: 8px;
 }
 
+.column-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.column-header-toggle-btn {
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .column-collapse-btn {
   font-size: 16px;
   font-weight: 700;
@@ -821,6 +832,10 @@ body {
   gap: 10px;
   margin-bottom: 16px;
   flex-wrap: wrap;
+}
+
+.reserva-lista-header {
+  margin-bottom: 8px;
 }
 
 .reserva-mini-list {

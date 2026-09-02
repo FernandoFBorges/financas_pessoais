@@ -27,6 +27,9 @@ export default function Dashboard() {
   const [despesasColapsada, setDespesasColapsada] = useState(() => localStorage.getItem('despesasColapsada') === '1')
   const [receitasColapsada, setReceitasColapsada] = useState(() => localStorage.getItem('receitasColapsada') === '1')
   const [painelColapsado, setPainelColapsado] = useState(() => localStorage.getItem('painelColapsado') === '1')
+  const [reservaListaColapsada, setReservaListaColapsada] = useState(
+    () => localStorage.getItem('reservaListaColapsada') === '1'
+  )
 
   useEffect(() => {
     localStorage.setItem('despesasColapsada', despesasColapsada ? '1' : '0')
@@ -39,6 +42,10 @@ export default function Dashboard() {
   useEffect(() => {
     localStorage.setItem('painelColapsado', painelColapsado ? '1' : '0')
   }, [painelColapsado])
+
+  useEffect(() => {
+    localStorage.setItem('reservaListaColapsada', reservaListaColapsada ? '1' : '0')
+  }, [reservaListaColapsada])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -501,18 +508,34 @@ export default function Dashboard() {
         </div>
 
         {reservaItems.length > 0 && (
-          <ul className="reserva-mini-list">
-            {reservaItems.map((r) => (
-              <li key={r.id}>
-                <span className={'tag ' + (r.tipo === 'deposito' ? 'tag-despesa' : 'tag-receita')}>
-                  {r.tipo === 'deposito' ? 'Depósito' : 'Resgate'}
-                </span>
-                <span className="reserva-mini-desc">{r.descricao || '—'}</span>
-                <span className="mono">{formatBRL(Number(r.valor))}</span>
-                <button className="icon-btn icon-btn-danger" onClick={() => excluirMovimentoReserva(r)} title="Excluir">✕</button>
-              </li>
-            ))}
-          </ul>
+          <>
+            <div className="reserva-lista-header">
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => setReservaListaColapsada((c) => !c)}
+              >
+                {reservaListaColapsada
+                  ? `▾ Mostrar movimentos da reserva (${reservaItems.length})`
+                  : '▴ Recolher movimentos da reserva'}
+              </button>
+            </div>
+
+            {!reservaListaColapsada && (
+              <ul className="reserva-mini-list">
+                {reservaItems.map((r) => (
+                  <li key={r.id}>
+                    <span className={'tag ' + (r.tipo === 'deposito' ? 'tag-despesa' : 'tag-receita')}>
+                      {r.tipo === 'deposito' ? 'Depósito' : 'Resgate'}
+                    </span>
+                    <span className="reserva-mini-desc">{r.descricao || '—'}</span>
+                    <span className="mono">{formatBRL(Number(r.valor))}</span>
+                    <button className="icon-btn icon-btn-danger" onClick={() => excluirMovimentoReserva(r)} title="Excluir">✕</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
         )}
       </div>
 
