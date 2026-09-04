@@ -868,11 +868,19 @@ body {
   white-space: nowrap;
 }
 
+.column-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
 .column-total-bar {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  margin: 6px 0 14px;
 }
 
 .column-total-efetivo {
@@ -949,9 +957,7 @@ body {
 
 .column-toolbar {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
   gap: 10px;
   flex-wrap: wrap;
 }
