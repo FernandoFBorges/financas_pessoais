@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { CompetenciaProvider } from './context/CompetenciaContext'
@@ -7,6 +8,8 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Configuracoes from './pages/Configuracoes'
 import Parametros from './pages/Parametros'
+
+const Gerencial = lazy(() => import('./pages/Gerencial'))
 
 function PrivateArea() {
   const { session, loading } = useAuth()
@@ -24,6 +27,14 @@ function PrivateArea() {
       <Layout>
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route
+            path="/gerencial"
+            element={
+              <Suspense fallback={<p className="empty-state">Carregando…</p>}>
+                <Gerencial />
+              </Suspense>
+            }
+          />
           <Route path="/config" element={<Configuracoes />} />
           <Route path="/parametros" element={<Parametros />} />
           <Route path="*" element={<Navigate to="/" replace />} />
