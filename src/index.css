@@ -1629,6 +1629,12 @@ body {
   font-family: var(--font-display);
   font-size: 15px;
   font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.chart-caption {
+  font-size: 11px;
+  color: var(--color-ink-soft);
   margin: 0 0 12px;
 }
 

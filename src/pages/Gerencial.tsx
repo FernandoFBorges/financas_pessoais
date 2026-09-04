@@ -116,27 +116,33 @@ export default function Gerencial() {
       const despesaFixaEfetivo = fixas.reduce((s, t) => s + valorEfetivoRealizado(t), 0)
       const despesaVariavelEfetivo = variaveis.reduce((s, t) => s + valorEfetivoRealizado(t), 0)
 
-      const comprometimento = receitaEfetivo > 0 ? (despesaEfetivo / receitaEfetivo) * 100 : null
+      // Empréstimo não é renda de verdade — fica de fora do % comprometida e do
+      // Salário x PJ, senão infla artificialmente a saúde financeira do mês.
+      const receitasEmprestimo = receitas.filter((t) => nomeCategoria(t.categoria_id) === 'Empréstimo')
+      const teveEmprestimo = receitasEmprestimo.some((t) => valorEfetivoRealizado(t) > 0)
+      const receitaSemEmprestimo = receitaEfetivo - receitasEmprestimo.reduce((s, t) => s + valorEfetivoRealizado(t), 0)
 
-      // Salário x PJ x Outras, em proporção da receita do mês
+      const comprometimento = receitaSemEmprestimo > 0 ? (despesaEfetivo / receitaSemEmprestimo) * 100 : null
+
+      // Salário x PJ x Outras, em proporção da receita do mês (sem empréstimo)
       const salarioEfetivo = receitas
         .filter((t) => nomeCategoria(t.categoria_id) === 'Salário')
         .reduce((s, t) => s + valorEfetivoRealizado(t), 0)
       const pjEfetivo = receitas
         .filter((t) => nomeCategoria(t.categoria_id) === 'PJ')
         .reduce((s, t) => s + valorEfetivoRealizado(t), 0)
-      const outrasEfetivo = receitaEfetivo - salarioEfetivo - pjEfetivo
+      const outrasEfetivo = receitaSemEmprestimo - salarioEfetivo - pjEfetivo
 
       return {
-        competencia: competenciaLabel(mes, ano),
+        competencia: competenciaLabel(mes, ano) + (teveEmprestimo ? ' 💰' : ''),
         receita: receitaEfetivo,
         despesa: despesaEfetivo,
         fixas: despesaFixaEfetivo,
         variaveis: despesaVariavelEfetivo,
         comprometimento,
-        salarioPct: receitaEfetivo > 0 ? (salarioEfetivo / receitaEfetivo) * 100 : 0,
-        pjPct: receitaEfetivo > 0 ? (pjEfetivo / receitaEfetivo) * 100 : 0,
-        outrasPct: receitaEfetivo > 0 ? (outrasEfetivo / receitaEfetivo) * 100 : 0,
+        salarioPct: receitaSemEmprestimo > 0 ? (salarioEfetivo / receitaSemEmprestimo) * 100 : 0,
+        pjPct: receitaSemEmprestimo > 0 ? (pjEfetivo / receitaSemEmprestimo) * 100 : 0,
+        outrasPct: receitaSemEmprestimo > 0 ? (outrasEfetivo / receitaSemEmprestimo) * 100 : 0,
       }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -289,6 +295,7 @@ export default function Gerencial() {
 
           <div className="ledger-card chart-card">
             <h3 className="chart-title">% da renda comprometida com despesas</h3>
+            <p className="chart-caption">Não considera "Empréstimo" como renda. Meses com 💰 tiveram entrada de empréstimo.</p>
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={dadosMensais}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
@@ -310,6 +317,7 @@ export default function Gerencial() {
 
           <div className="ledger-card chart-card">
             <h3 className="chart-title">Receitas: Salário x PJ (% do mês)</h3>
+            <p className="chart-caption">Não considera "Empréstimo" como renda. Meses com 💰 tiveram entrada de empréstimo.</p>
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={dadosMensais}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
