@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Redirecionando…</title>
+    <script type="text/javascript">
+      // Truque padrão pra SPA no GitHub Pages: como não existe servidor de
+      // verdade roteando (só arquivos estáticos), quando alguém recarrega a
+      // página numa sub-rota (ex: /gerencial), o GitHub Pages não acha um
+      // arquivo com esse nome e cai aqui. Em vez de mostrar 404 de verdade,
+      // reescreve a URL como query string e manda de volta pro index.html —
+      // que devolve pra rota certa assim que o React Router carrega.
+      var pathSegmentsToKeep = 1 // /financas_pessoais/ — 1 segmento de base
+
+      var l = window.location
+      l.replace(
+        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+        l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
+        l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
+        (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+        l.hash
+      )
+    </script>
+  </head>
+  <body></body>
+</html>
