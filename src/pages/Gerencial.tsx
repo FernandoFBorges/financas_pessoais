@@ -101,7 +101,7 @@ export default function Gerencial() {
 
   // ---------- Gráfico 1: Receita x Despesa (efetivo) por competência ----------
   // ---------- Gráfico 3: Fixas x Variáveis ----------
-  // ---------- Gráfico 5: Previsto x Efetivo (despesas) ----------
+  // ---------- Gráfico novo: % da renda comprometida com despesas ----------
   const dadosMensais = useMemo(() => {
     return meses.map(({ mes, ano }) => {
       const doMes = transacoes.filter((t) => t.competencia_mes === mes && t.competencia_ano === ano)
@@ -110,27 +110,39 @@ export default function Gerencial() {
 
       const receitaEfetivo = receitas.reduce((s, t) => s + valorEfetivoRealizado(t), 0)
       const despesaEfetivo = despesas.reduce((s, t) => s + valorEfetivoRealizado(t), 0)
-      const receitaPrevisto = receitas.reduce((s, t) => s + Number(t.valor), 0)
-      const despesaPrevisto = despesas.reduce((s, t) => s + Number(t.valor), 0)
 
       const fixas = despesas.filter((t) => t.recorrente || t.grupo_parcelamento_id != null)
       const variaveis = despesas.filter((t) => !t.recorrente && !t.grupo_parcelamento_id)
       const despesaFixaEfetivo = fixas.reduce((s, t) => s + valorEfetivoRealizado(t), 0)
       const despesaVariavelEfetivo = variaveis.reduce((s, t) => s + valorEfetivoRealizado(t), 0)
 
+      const comprometimento = receitaEfetivo > 0 ? (despesaEfetivo / receitaEfetivo) * 100 : null
+
+      // Salário x PJ x Outras, em proporção da receita do mês
+      const salarioEfetivo = receitas
+        .filter((t) => nomeCategoria(t.categoria_id) === 'Salário')
+        .reduce((s, t) => s + valorEfetivoRealizado(t), 0)
+      const pjEfetivo = receitas
+        .filter((t) => nomeCategoria(t.categoria_id) === 'PJ')
+        .reduce((s, t) => s + valorEfetivoRealizado(t), 0)
+      const outrasEfetivo = receitaEfetivo - salarioEfetivo - pjEfetivo
+
       return {
         competencia: competenciaLabel(mes, ano),
         receita: receitaEfetivo,
         despesa: despesaEfetivo,
-        receitaPrevisto,
-        despesaPrevisto,
         fixas: despesaFixaEfetivo,
         variaveis: despesaVariavelEfetivo,
+        comprometimento,
+        salarioPct: receitaEfetivo > 0 ? (salarioEfetivo / receitaEfetivo) * 100 : 0,
+        pjPct: receitaEfetivo > 0 ? (pjEfetivo / receitaEfetivo) * 100 : 0,
+        outrasPct: receitaEfetivo > 0 ? (outrasEfetivo / receitaEfetivo) * 100 : 0,
       }
     })
-  }, [meses, transacoes])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meses, transacoes, categories])
 
-  // ---------- Gráfico 2: Saldo acumulado ----------
+  // ---------- Gráfico 2: Saldo acumulado — Geral e Reserva juntos ----------
   const dadosSaldo = useMemo(() => {
     if (meses.length === 0) return []
 
@@ -146,6 +158,7 @@ export default function Gerencial() {
       .reduce((acc, r) => acc + (r.tipo === 'deposito' ? Number(r.valor) : -Number(r.valor)), 0)
 
     let saldoCorrente = saldoInicialGeral + netAntes - netReservaAntes
+    let saldoReservaCorrente = netReservaAntes
 
     return meses.map(({ mes, ano }) => {
       const doMes = transacoes.filter((t) => t.competencia_mes === mes && t.competencia_ano === ano)
@@ -157,7 +170,12 @@ export default function Gerencial() {
         0
       )
       saldoCorrente = saldoCorrente + receitaEfetivo - despesaEfetivo - netReservaMes
-      return { competencia: competenciaLabel(mes, ano), saldo: saldoCorrente }
+      saldoReservaCorrente += netReservaMes
+      return {
+        competencia: competenciaLabel(mes, ano),
+        saldoGeral: saldoCorrente,
+        saldoReserva: saldoReservaCorrente,
+      }
     })
   }, [meses, transacoes, reserva, saldoInicialGeral, inicioSeq])
 
@@ -240,14 +258,16 @@ export default function Gerencial() {
           </div>
 
           <div className="ledger-card chart-card">
-            <h3 className="chart-title">Saldo acumulado</h3>
+            <h3 className="chart-title">Saldo acumulado — Geral x Reserva</h3>
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={dadosSaldo}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                 <XAxis dataKey="competencia" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatBRL(v)} width={80} />
                 <Tooltip formatter={(v) => formatBRL(Number(v))} />
-                <Line type="monotone" dataKey="saldo" name="Saldo" stroke="var(--color-primary)" strokeWidth={2.5} dot={{ r: 3 }} />
+                <Legend />
+                <Line type="monotone" dataKey="saldoGeral" name="Saldo geral" stroke="var(--color-primary)" strokeWidth={2.5} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="saldoReserva" name="Reserva" stroke="var(--color-gold)" strokeWidth={2.5} dot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -263,6 +283,43 @@ export default function Gerencial() {
                 <Legend />
                 <Bar dataKey="fixas" name="Fixas" stackId="d" fill="var(--color-primary)" />
                 <Bar dataKey="variaveis" name="Variáveis" stackId="d" fill="var(--color-gold)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="ledger-card chart-card">
+            <h3 className="chart-title">% da renda comprometida com despesas</h3>
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={dadosMensais}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                <XAxis dataKey="competencia" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} width={50} />
+                <Tooltip formatter={(v) => (v == null ? 'sem receita' : `${Number(v).toFixed(0)}%`)} />
+                <Line
+                  type="monotone"
+                  dataKey="comprometimento"
+                  name="% comprometido"
+                  stroke="var(--color-despesa)"
+                  strokeWidth={2.5}
+                  dot={{ r: 3 }}
+                  connectNulls={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="ledger-card chart-card">
+            <h3 className="chart-title">Receitas: Salário x PJ (% do mês)</h3>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={dadosMensais}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                <XAxis dataKey="competencia" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} width={50} domain={[0, 100]} />
+                <Tooltip formatter={(v) => `${Number(v).toFixed(0)}%`} />
+                <Legend />
+                <Bar dataKey="salarioPct" name="Salário" stackId="r" fill="var(--color-primary)" />
+                <Bar dataKey="pjPct" name="PJ" stackId="r" fill="var(--color-receita)" />
+                <Bar dataKey="outrasPct" name="Outras" stackId="r" fill="var(--color-gold)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -296,21 +353,6 @@ export default function Gerencial() {
                 </PieChart>
               </ResponsiveContainer>
             )}
-          </div>
-
-          <div className="ledger-card chart-card chart-card-full">
-            <h3 className="chart-title">Despesas: Previsto x Efetivo por competência</h3>
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={dadosMensais}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="competencia" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatBRL(v)} width={80} />
-                <Tooltip formatter={(v) => formatBRL(Number(v))} />
-                <Legend />
-                <Bar dataKey="despesaPrevisto" name="Previsto" fill="var(--color-border)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="despesa" name="Efetivo" fill="var(--color-despesa)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
           </div>
         </div>
       )}
