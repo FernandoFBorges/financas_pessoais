@@ -995,6 +995,12 @@ body {
   font-weight: 700;
 }
 
+.selecao-limpar-btn {
+  margin-left: auto;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
 .btn-sm {
   padding: 6px 14px;
   font-size: 12.5px;

@@ -150,6 +150,10 @@ export default function TransactionColumn({
     })
   }
 
+  function limparSelecao() {
+    setSelecionados(new Set())
+  }
+
   async function registrarPagamentoSelecionados() {
     const ids = [...selecionados]
     if (ids.length === 0) return
@@ -447,6 +451,9 @@ export default function TransactionColumn({
             </button>
             <button className="btn btn-ghost btn-sm" onClick={excluirSelecionados} disabled={processandoMassa}>
               Excluir
+            </button>
+            <button className="link-btn selecao-limpar-btn" onClick={limparSelecao} disabled={processandoMassa}>
+              Limpar seleção
             </button>
           </div>
         )}
