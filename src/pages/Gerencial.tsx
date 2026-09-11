@@ -136,6 +136,8 @@ export default function Gerencial() {
       return {
         competencia: competenciaLabel(mes, ano) + (teveEmprestimo ? ' 💰' : ''),
         receita: receitaEfetivo,
+        receitaSemEmprestimo,
+        receitaEmprestimo: receitaEfetivo - receitaSemEmprestimo,
         despesa: despesaEfetivo,
         fixas: despesaFixaEfetivo,
         variaveis: despesaVariavelEfetivo,
@@ -250,6 +252,7 @@ export default function Gerencial() {
         <div className="gerencial-grid">
           <div className="ledger-card chart-card">
             <h3 className="chart-title">Receita x Despesa por competência</h3>
+            <p className="chart-caption">A parte amarela da receita é o valor de "Empréstimo" — o resto da coluna é receita de verdade.</p>
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={dadosMensais}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
@@ -257,7 +260,8 @@ export default function Gerencial() {
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatBRL(v)} width={80} />
                 <Tooltip formatter={(v) => formatBRL(Number(v))} />
                 <Legend />
-                <Bar dataKey="receita" name="Receita" fill="var(--color-receita)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="receitaSemEmprestimo" name="Receita" stackId="receita" fill="var(--color-receita)" />
+                <Bar dataKey="receitaEmprestimo" name="Empréstimo" stackId="receita" fill="var(--color-gold)" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="despesa" name="Despesa" fill="var(--color-despesa)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
