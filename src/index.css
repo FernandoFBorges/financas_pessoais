@@ -1323,6 +1323,16 @@ body {
   font-weight: 700;
 }
 
+.group-row-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.group-row-label input[type="checkbox"] {
+  cursor: pointer;
+}
+
 .group-header-totais {
   display: flex;
   gap: 10px;

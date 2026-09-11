@@ -139,6 +139,22 @@ export default function TransactionColumn({
     })
   }
 
+  function grupoTotalmenteSelecionado(itens: Transaction[]) {
+    return itens.length > 0 && itens.every((t) => selecionados.has(t.id))
+  }
+
+  function alternarSelecionarGrupo(itens: Transaction[]) {
+    const todosJaSelecionados = grupoTotalmenteSelecionado(itens)
+    setSelecionados((prev) => {
+      const next = new Set(prev)
+      itens.forEach((t) => {
+        if (todosJaSelecionados) next.delete(t.id)
+        else next.add(t.id)
+      })
+      return next
+    })
+  }
+
   function inverterSelecao() {
     setSelecionados((prev) => {
       const next = new Set(prev)
@@ -553,7 +569,16 @@ export default function TransactionColumn({
                     <tr className="group-row">
                       <td colSpan={colOrder.length + 2}>
                         <span className="group-row-inner">
-                          <span>{g.label}</span>
+                          <span className="group-row-label">
+                            <input
+                              type="checkbox"
+                              checked={grupoTotalmenteSelecionado(g.itens)}
+                              onChange={() => alternarSelecionarGrupo(g.itens)}
+                              title={`Selecionar todos de "${g.label}"`}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <span>{g.label}</span>
+                          </span>
                           <span className="group-header-totais">
                             <span className="mono">{formatBRL(g.itens.reduce((s, t) => s + valorEfetivoRealizado(t), 0))}</span>
                             <span className="mono group-previsto">
