@@ -34,13 +34,14 @@ interface Props {
   onAntecipar: (t: Transaction) => void
   colapsada: boolean
   onToggleColapsar: () => void
+  dadosProntos: boolean
 }
 
 export default function TransactionColumn({
   tipo, titulo, items, categories, paymentMethods,
   onDuplicar, onEditar, onSalvarEfetivo, onExcluir,
   onRegistrarPagamentoEmMassa, onExcluirEmMassa, onAntecipar,
-  colapsada, onToggleColapsar,
+  colapsada, onToggleColapsar, dadosProntos,
 }: Props) {
   const [filtroCategoria, setFiltroCategoria] = useState('')
   const [filtroMeio, setFiltroMeio] = useState('')
@@ -372,7 +373,7 @@ export default function TransactionColumn({
         <button className="column-expand-btn" onClick={onToggleColapsar} title={`Expandir ${titulo}`}>
           <span className="column-collapsed-icon">{setaExpandir}</span>
           <span className="column-collapsed-label">{titulo}</span>
-          <span className="column-collapsed-total mono">{formatBRL(totalEfetivo)}</span>
+          <span className="column-collapsed-total mono">{dadosProntos ? formatBRL(totalEfetivo) : '…'}</span>
         </button>
       </div>
     )
@@ -399,8 +400,8 @@ export default function TransactionColumn({
 
         <div className="column-summary-row">
           <div className="column-total-bar">
-            <span className="column-total-efetivo">{formatBRL(totalEfetivo)}</span>
-            <span className="column-total-previsto">previsto {formatBRL(totalPrevisto)}</span>
+            <span className="column-total-efetivo">{dadosProntos ? formatBRL(totalEfetivo) : '…'}</span>
+            <span className="column-total-previsto">previsto {dadosProntos ? formatBRL(totalPrevisto) : '…'}</span>
           </div>
 
           <div className="column-toolbar">
@@ -432,18 +433,18 @@ export default function TransactionColumn({
             </div>
             <div className="fixo-variavel-row">
               <span>Despesas Fixas</span>
-              <span className="mono">{formatBRL(resumoFixoVariavel.previstoFixas)}</span>
-              <span className="mono">{formatBRL(resumoFixoVariavel.pagoFixas)}</span>
+              <span className="mono">{dadosProntos ? formatBRL(resumoFixoVariavel.previstoFixas) : '…'}</span>
+              <span className="mono">{dadosProntos ? formatBRL(resumoFixoVariavel.pagoFixas) : '…'}</span>
             </div>
             <div className="fixo-variavel-row">
               <span>Despesas Variáveis</span>
-              <span className="mono">{formatBRL(resumoFixoVariavel.previstoVariaveis)}</span>
-              <span className="mono">{formatBRL(resumoFixoVariavel.pagoVariaveis)}</span>
+              <span className="mono">{dadosProntos ? formatBRL(resumoFixoVariavel.previstoVariaveis) : '…'}</span>
+              <span className="mono">{dadosProntos ? formatBRL(resumoFixoVariavel.pagoVariaveis) : '…'}</span>
             </div>
             <div className="fixo-variavel-row fixo-variavel-total">
               <span>Total Despesas</span>
-              <span className="mono">{formatBRL(resumoFixoVariavel.totalPrevistoGeral)}</span>
-              <span className="mono">{formatBRL(resumoFixoVariavel.totalPagoGeral)}</span>
+              <span className="mono">{dadosProntos ? formatBRL(resumoFixoVariavel.totalPrevistoGeral) : '…'}</span>
+              <span className="mono">{dadosProntos ? formatBRL(resumoFixoVariavel.totalPagoGeral) : '…'}</span>
             </div>
             <div className="fixo-variavel-restante">
               <span>
@@ -454,7 +455,7 @@ export default function TransactionColumn({
                     : ` — ${resumoFixoVariavel.pendentes} pendente${resumoFixoVariavel.pendentes > 1 ? 's' : ''}`}
                 </span>
               </span>
-              <span className="mono">{formatBRL(resumoFixoVariavel.restante)}</span>
+              <span className="mono">{dadosProntos ? formatBRL(resumoFixoVariavel.restante) : '…'}</span>
             </div>
           </div>
         )}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { supabase } from '../lib/supabase'
 import { useCompetencia } from '../context/CompetenciaContext'
 import { useLookups } from '../lib/useLookups'
@@ -48,6 +48,7 @@ export default function Dashboard() {
   }, [reservaListaColapsada])
 
   const [resumoPronto, setResumoPronto] = useState(false)
+  const pedidoAtualRef = useRef(0)
 
   // O Supabase limita a 1000 linhas por consulta por padrão — sem paginar, contas
   // que somam "tudo antes desse mês" ficam incompletas assim que o histórico cresce
@@ -78,96 +79,78 @@ export default function Dashboard() {
     return todasLinhas
   }
 
-  // Uma ÚNICA operação, disparada por troca de competência, que busca tudo que os
-  // cards do topo precisam (lançamentos do mês, acumulado anterior, reserva) e só
-  // aplica o resultado de uma vez — nunca em pedaços. Duas coisas que isso evita:
-  //   1) Card mostrando combinação errada (dado novo de uma busca + dado velho de
-  //      outra, só porque uma terminou antes da outra).
-  //   2) Resposta atrasada de um mês que você já saiu sobrescrever o mês atual —
-  //      o "ignore" descarta qualquer resultado de uma competência abandonada.
-  useEffect(() => {
-    let ignore = false
-    // Busca de dados ao trocar de competência — sincronização com o Supabase
-    // (sistema externo), não um cálculo derivável durante o render.
-    // oxlint-disable-next-line react/set-state-in-effect
+  // Uma ÚNICA operação, chamada por QUALQUER gatilho (troca de mês, salvar, editar,
+  // excluir, antecipar, duplicar recorrentes, mexer na reserva...), que busca tudo
+  // que os cards e os totalizadores precisam e só aplica o resultado de uma vez —
+  // nunca em pedaços. Três coisas que isso evita:
+  //   1) Card/totalizador mostrando combinação errada (dado novo de uma busca +
+  //      dado velho de outra, só porque uma terminou antes da outra).
+  //   2) Resposta atrasada de uma chamada anterior (ex: você editou duas coisas
+  //      rápido, ou trocou de mês no meio de uma ação) sobrescrever o resultado
+  //      mais novo — só a ÚLTIMA chamada disparada tem permissão de aplicar o que
+  //      encontrou.
+  //   3) Card mostrando número desatualizado por um instante logo após qualquer
+  //      ação — a UI marca "não pronto" já no início da chamada, não só na troca
+  //      de mês.
+  const carregarTudo = useCallback(async () => {
+    const meuPedido = ++pedidoAtualRef.current
     setLoading(true)
-    // oxlint-disable-next-line react/set-state-in-effect
     setResumoPronto(false)
 
-    async function carregarTudo() {
-      const [itemsResp, linhasAnteriores, reservaAnterior, reservaResp] = await Promise.all([
-        supabase
-          .from('transactions')
-          .select('*')
-          .eq('competencia_mes', mes)
-          .eq('competencia_ano', ano)
-          .order('data_lancamento', { ascending: true }),
-        buscarTudoAntesDe('transactions', 'tipo, valor, valor_efetivo', ano, mes),
-        buscarTudoAntesDe('reserva_movimentos', 'tipo, valor', ano, mes),
-        supabase
-          .from('reserva_movimentos')
-          .select('*')
-          .eq('competencia_mes', mes)
-          .eq('competencia_ano', ano)
-          .order('data_lancamento', { ascending: true }),
-      ])
+    const [itemsResp, linhasAnteriores, reservaAnterior, reservaResp] = await Promise.all([
+      supabase
+        .from('transactions')
+        .select('*')
+        .eq('competencia_mes', mes)
+        .eq('competencia_ano', ano)
+        .order('data_lancamento', { ascending: true }),
+      buscarTudoAntesDe('transactions', 'tipo, valor, valor_efetivo', ano, mes),
+      buscarTudoAntesDe('reserva_movimentos', 'tipo, valor', ano, mes),
+      supabase
+        .from('reserva_movimentos')
+        .select('*')
+        .eq('competencia_mes', mes)
+        .eq('competencia_ano', ano)
+        .order('data_lancamento', { ascending: true }),
+    ])
 
-      if (ignore) return
+    // Chegou uma chamada mais nova enquanto essa ainda buscava — descarta.
+    if (meuPedido !== pedidoAtualRef.current) return
 
-      setItems((itemsResp.data as Transaction[]) ?? [])
+    setItems((itemsResp.data as Transaction[]) ?? [])
 
-      const linhas = linhasAnteriores as unknown as { tipo: string; valor: number; valor_efetivo: number | null }[]
-      const soma = linhas.reduce((acc, t) => {
-        const efetivo = valorEfetivoRealizado(t)
-        return acc + (t.tipo === 'receita' ? efetivo : -efetivo)
-      }, 0)
-      setAcumuladoAnterior(soma)
+    const linhas = linhasAnteriores as unknown as { tipo: string; valor: number; valor_efetivo: number | null }[]
+    const soma = linhas.reduce((acc, t) => {
+      const efetivo = valorEfetivoRealizado(t)
+      return acc + (t.tipo === 'receita' ? efetivo : -efetivo)
+    }, 0)
+    setAcumuladoAnterior(soma)
 
-      const pendente = linhas
-        .filter((t) => t.tipo === 'despesa' && !estaPago(t))
-        .reduce((acc, t) => acc + Number(t.valor), 0)
-      setPendenteDespesasAnteriores(pendente)
+    const pendente = linhas
+      .filter((t) => t.tipo === 'despesa' && !estaPago(t))
+      .reduce((acc, t) => acc + Number(t.valor), 0)
+    setPendenteDespesasAnteriores(pendente)
 
-      const linhasReserva = reservaAnterior as unknown as { tipo: string; valor: number }[]
-      const netReserva = linhasReserva.reduce(
-        (acc, r) => acc + (r.tipo === 'deposito' ? Number(r.valor) : -Number(r.valor)),
-        0
-      )
-      setReservaAcumuladaAnterior(netReserva)
+    const linhasReserva = reservaAnterior as unknown as { tipo: string; valor: number }[]
+    const netReserva = linhasReserva.reduce(
+      (acc, r) => acc + (r.tipo === 'deposito' ? Number(r.valor) : -Number(r.valor)),
+      0
+    )
+    setReservaAcumuladaAnterior(netReserva)
 
-      setReservaItems((reservaResp.data as ReservaMovimento[]) ?? [])
+    setReservaItems((reservaResp.data as ReservaMovimento[]) ?? [])
 
-      setLoading(false)
-      setInitialLoadDone(true)
-      setResumoPronto(true)
-    }
+    setLoading(false)
+    setInitialLoadDone(true)
+    setResumoPronto(true)
+  }, [mes, ano])
 
+  useEffect(() => {
+    // Busca de dados ao trocar de competência (ou montar a tela) — sincronização
+    // com o Supabase (sistema externo), não um cálculo derivável durante o render.
+    // oxlint-disable-next-line react/set-state-in-effect
     carregarTudo()
-    return () => {
-      ignore = true
-    }
-  }, [mes, ano])
-
-  // Recarrega tudo (sem trocar de mês) — usado depois de salvar/editar/excluir.
-  const load = useCallback(async () => {
-    const { data } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('competencia_mes', mes)
-      .eq('competencia_ano', ano)
-      .order('data_lancamento', { ascending: true })
-    setItems((data as Transaction[]) ?? [])
-  }, [mes, ano])
-
-  const loadReserva = useCallback(async () => {
-    const { data } = await supabase
-      .from('reserva_movimentos')
-      .select('*')
-      .eq('competencia_mes', mes)
-      .eq('competencia_ano', ano)
-      .order('data_lancamento', { ascending: true })
-    setReservaItems((data as ReservaMovimento[]) ?? [])
-  }, [mes, ano])
+  }, [carregarTudo])
 
   // Saldo inicial cadastrado em Parâmetros (uma vez só, não depende do mês)
   useEffect(() => {
@@ -252,7 +235,7 @@ export default function Dashboard() {
     }))
 
     await supabase.from('transactions').insert(novos)
-    load()
+    carregarTudo()
   }
 
   function abrirDuplicar(t: Transaction) {
@@ -288,12 +271,12 @@ export default function Dashboard() {
 
   function onSalvo() {
     fecharModal()
-    load()
+    carregarTudo()
   }
 
   async function salvarEfetivo(t: Transaction, valor: number | null) {
     await supabase.from('transactions').update({ valor_efetivo: valor }).eq('id', t.id)
-    load()
+    carregarTudo()
   }
 
   async function excluir(t: Transaction) {
@@ -306,7 +289,7 @@ export default function Dashboard() {
       return
     }
     await supabase.from('transactions').delete().eq('id', t.id)
-    load()
+    carregarTudo()
   }
 
   async function registrarPagamentoEmMassa(ids: string[]) {
@@ -316,12 +299,12 @@ export default function Dashboard() {
     await Promise.all(
       selecionados.map((t) => supabase.from('transactions').update({ valor_efetivo: t.valor }).eq('id', t.id))
     )
-    load()
+    carregarTudo()
   }
 
   async function excluirEmMassa(ids: string[]) {
     await supabase.from('transactions').delete().in('id', ids)
-    load()
+    carregarTudo()
   }
 
   function abrirReserva() {
@@ -334,13 +317,13 @@ export default function Dashboard() {
 
   function onReservaSalva() {
     fecharReserva()
-    loadReserva()
+    carregarTudo()
   }
 
   async function excluirMovimentoReserva(m: ReservaMovimento) {
     if (!confirm('Excluir este movimento de reserva?')) return
     await supabase.from('reserva_movimentos').delete().eq('id', m.id)
-    loadReserva()
+    carregarTudo()
   }
 
   function somarMeses(m: number, a: number, delta: number) {
@@ -441,7 +424,7 @@ export default function Dashboard() {
       })
     )
 
-    load()
+    carregarTudo()
   }
 
   const modalTitulo = modalEditando
@@ -586,6 +569,7 @@ export default function Dashboard() {
             onAntecipar={antecipar}
             colapsada={despesasColapsada}
             onToggleColapsar={() => setDespesasColapsada((c) => !c)}
+            dadosProntos={resumoPronto}
           />
           <TransactionColumn
             tipo="receita"
@@ -602,6 +586,7 @@ export default function Dashboard() {
             onAntecipar={antecipar}
             colapsada={receitasColapsada}
             onToggleColapsar={() => setReceitasColapsada((c) => !c)}
+            dadosProntos={resumoPronto}
           />
         </div>
       )}
