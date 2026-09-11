@@ -618,6 +618,13 @@ body {
   color: var(--color-ink-soft);
 }
 
+.dash-card-loading {
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: var(--color-ink-soft);
+}
+
 .dashboard-bar-compact strong {
   color: var(--color-ink);
 }

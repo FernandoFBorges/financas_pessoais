@@ -47,49 +47,7 @@ export default function Dashboard() {
     localStorage.setItem('reservaListaColapsada', reservaListaColapsada ? '1' : '0')
   }, [reservaListaColapsada])
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    const { data } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('competencia_mes', mes)
-      .eq('competencia_ano', ano)
-      .order('data_lancamento', { ascending: true })
-    setItems((data as Transaction[]) ?? [])
-    setLoading(false)
-    setInitialLoadDone(true)
-  }, [mes, ano])
-
-  useEffect(() => {
-    // Busca de dados ao trocar de competência — sincronização com o Supabase
-    // (sistema externo), não um cálculo derivável durante o render.
-    // oxlint-disable-next-line react/set-state-in-effect
-    load()
-  }, [load])
-
-  const loadReserva = useCallback(async () => {
-    const { data } = await supabase
-      .from('reserva_movimentos')
-      .select('*')
-      .eq('competencia_mes', mes)
-      .eq('competencia_ano', ano)
-      .order('data_lancamento', { ascending: true })
-    setReservaItems((data as ReservaMovimento[]) ?? [])
-  }, [mes, ano])
-
-  useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect
-    loadReserva()
-  }, [loadReserva])
-
-  // Saldo inicial cadastrado em Parâmetros (uma vez só, não depende do mês)
-  useEffect(() => {
-    async function carregarSaldoInicial() {
-      const { data } = await supabase.from('user_settings').select('saldo_inicial').maybeSingle()
-      setSaldoInicialGeral(data?.saldo_inicial != null ? Number(data.saldo_inicial) : 0)
-    }
-    carregarSaldoInicial()
-  }, [])
+  const [resumoPronto, setResumoPronto] = useState(false)
 
   // O Supabase limita a 1000 linhas por consulta por padrão — sem paginar, contas
   // que somam "tudo antes desse mês" ficam incompletas assim que o histórico cresce
@@ -120,15 +78,45 @@ export default function Dashboard() {
     return todasLinhas
   }
 
-  // Soma efetiva (receita - despesa) de todas as competências ANTERIORES à selecionada,
-  // pra saber quanto já tinha acumulado ao entrar no mês atual — e, de quebra, quanto
-  // de despesa de meses passados ainda ficou pendente (sem valor efetivo lançado), e
-  // quanto já tinha ido pra reserva antes deste mês.
+  // Uma ÚNICA operação, disparada por troca de competência, que busca tudo que os
+  // cards do topo precisam (lançamentos do mês, acumulado anterior, reserva) e só
+  // aplica o resultado de uma vez — nunca em pedaços. Duas coisas que isso evita:
+  //   1) Card mostrando combinação errada (dado novo de uma busca + dado velho de
+  //      outra, só porque uma terminou antes da outra).
+  //   2) Resposta atrasada de um mês que você já saiu sobrescrever o mês atual —
+  //      o "ignore" descarta qualquer resultado de uma competência abandonada.
   useEffect(() => {
-    async function carregarAcumulado() {
-      const data = await buscarTudoAntesDe('transactions', 'tipo, valor, valor_efetivo', ano, mes)
+    let ignore = false
+    // Busca de dados ao trocar de competência — sincronização com o Supabase
+    // (sistema externo), não um cálculo derivável durante o render.
+    // oxlint-disable-next-line react/set-state-in-effect
+    setLoading(true)
+    // oxlint-disable-next-line react/set-state-in-effect
+    setResumoPronto(false)
 
-      const linhas = data as unknown as { tipo: string; valor: number; valor_efetivo: number | null }[]
+    async function carregarTudo() {
+      const [itemsResp, linhasAnteriores, reservaAnterior, reservaResp] = await Promise.all([
+        supabase
+          .from('transactions')
+          .select('*')
+          .eq('competencia_mes', mes)
+          .eq('competencia_ano', ano)
+          .order('data_lancamento', { ascending: true }),
+        buscarTudoAntesDe('transactions', 'tipo, valor, valor_efetivo', ano, mes),
+        buscarTudoAntesDe('reserva_movimentos', 'tipo, valor', ano, mes),
+        supabase
+          .from('reserva_movimentos')
+          .select('*')
+          .eq('competencia_mes', mes)
+          .eq('competencia_ano', ano)
+          .order('data_lancamento', { ascending: true }),
+      ])
+
+      if (ignore) return
+
+      setItems((itemsResp.data as Transaction[]) ?? [])
+
+      const linhas = linhasAnteriores as unknown as { tipo: string; valor: number; valor_efetivo: number | null }[]
       const soma = linhas.reduce((acc, t) => {
         const efetivo = valorEfetivoRealizado(t)
         return acc + (t.tipo === 'receita' ? efetivo : -efetivo)
@@ -140,17 +128,55 @@ export default function Dashboard() {
         .reduce((acc, t) => acc + Number(t.valor), 0)
       setPendenteDespesasAnteriores(pendente)
 
-      const reservaAnterior = await buscarTudoAntesDe('reserva_movimentos', 'tipo, valor', ano, mes)
-
       const linhasReserva = reservaAnterior as unknown as { tipo: string; valor: number }[]
       const netReserva = linhasReserva.reduce(
         (acc, r) => acc + (r.tipo === 'deposito' ? Number(r.valor) : -Number(r.valor)),
         0
       )
       setReservaAcumuladaAnterior(netReserva)
+
+      setReservaItems((reservaResp.data as ReservaMovimento[]) ?? [])
+
+      setLoading(false)
+      setInitialLoadDone(true)
+      setResumoPronto(true)
     }
-    carregarAcumulado()
+
+    carregarTudo()
+    return () => {
+      ignore = true
+    }
   }, [mes, ano])
+
+  // Recarrega tudo (sem trocar de mês) — usado depois de salvar/editar/excluir.
+  const load = useCallback(async () => {
+    const { data } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('competencia_mes', mes)
+      .eq('competencia_ano', ano)
+      .order('data_lancamento', { ascending: true })
+    setItems((data as Transaction[]) ?? [])
+  }, [mes, ano])
+
+  const loadReserva = useCallback(async () => {
+    const { data } = await supabase
+      .from('reserva_movimentos')
+      .select('*')
+      .eq('competencia_mes', mes)
+      .eq('competencia_ano', ano)
+      .order('data_lancamento', { ascending: true })
+    setReservaItems((data as ReservaMovimento[]) ?? [])
+  }, [mes, ano])
+
+  // Saldo inicial cadastrado em Parâmetros (uma vez só, não depende do mês)
+  useEffect(() => {
+    async function carregarSaldoInicial() {
+      const { data } = await supabase.from('user_settings').select('saldo_inicial').maybeSingle()
+      setSaldoInicialGeral(data?.saldo_inicial != null ? Number(data.saldo_inicial) : 0)
+    }
+    carregarSaldoInicial()
+  }, [])
 
   const receitas = items.filter((i) => i.tipo === 'receita')
   const despesas = items.filter((i) => i.tipo === 'despesa')
@@ -441,7 +467,9 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {painelColapsado ? (
+        {!resumoPronto ? (
+          <div className="ledger-card dash-card-loading">Atualizando os números do mês…</div>
+        ) : painelColapsado ? (
           <div className="dashboard-bar-compact">
             <span>Saldo inicial: <strong className="mono">{formatBRL(saldoInicialDoMes)}</strong></span>
             <span className="dash-receita">Receitas: <strong className="mono">{formatBRL(efetivoReceitas)}</strong></span>
