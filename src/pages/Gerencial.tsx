@@ -36,11 +36,6 @@ function seq(ano: number, mes: number) {
   return ano * 12 + mes
 }
 
-function subtrairMeses(mes: number, ano: number, n: number) {
-  const total = ano * 12 + (mes - 1) - n
-  return { mes: (((total % 12) + 12) % 12) + 1, ano: Math.floor(total / 12) }
-}
-
 function competenciaLabel(mes: number, ano: number) {
   return `${MESES[mes - 1].slice(0, 3)}/${String(ano).slice(2)}`
 }
@@ -49,9 +44,8 @@ export default function Gerencial() {
   const { mes: mesAtual, ano: anoAtual } = useCompetencia()
   const { categories } = useLookups()
 
-  const padrao = subtrairMeses(mesAtual, anoAtual, 5)
-  const [mesInicio, setMesInicio] = useState(padrao.mes)
-  const [anoInicio, setAnoInicio] = useState(padrao.ano)
+  const [mesInicio, setMesInicio] = useState(1)
+  const [anoInicio, setAnoInicio] = useState(anoAtual)
   const [mesFim, setMesFim] = useState(mesAtual)
   const [anoFim, setAnoFim] = useState(anoAtual)
 
