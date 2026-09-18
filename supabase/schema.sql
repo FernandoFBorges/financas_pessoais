@@ -195,3 +195,14 @@ create policy "reserva_movimentos_delete_own" on reserva_movimentos
 
 create index if not exists idx_reserva_competencia
   on reserva_movimentos (user_id, competencia_ano, competencia_mes);
+
+-- =========================================================
+-- Migração — tema (claro/escuro) salvo no usuário, não só no
+-- navegador. Resolve o tema "esquecendo" quando você alterna
+-- entre o PWA instalado e a aba comum (cada um pode ter seu
+-- próprio localStorage no celular, mas o banco é único).
+-- Rode uma vez no SQL Editor do Supabase.
+-- =========================================================
+
+alter table user_settings
+  add column if not exists tema text check (tema in ('light', 'dark'));
