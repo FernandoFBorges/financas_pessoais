@@ -31,6 +31,7 @@ export interface Transaction {
   parcela_total: number | null
   grupo_parcelamento_id: string | null
   recorrente: boolean
+  dia_vencimento: number | null
   observacao: string | null
   created_at: string
 }
