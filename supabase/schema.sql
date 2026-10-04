@@ -206,11 +206,3 @@ create index if not exists idx_reserva_competencia
 
 alter table user_settings
   add column if not exists tema text check (tema in ('light', 'dark'));
-
--- =========================================================
--- Migração — dia de vencimento (despesas recorrentes/parceladas)
--- Rode uma vez no SQL Editor do Supabase.
--- =========================================================
-
-alter table transactions
-  add column if not exists dia_vencimento integer check (dia_vencimento between 1 and 31);

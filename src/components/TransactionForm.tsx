@@ -43,9 +43,6 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
   const [competenciaMes, setCompetenciaMes] = useState(base?.competencia_mes ?? mes)
   const [competenciaAno, setCompetenciaAno] = useState(base?.competencia_ano ?? ano)
   const [recorrente, setRecorrente] = useState(editando?.recorrente ?? !!prefill)
-  const [diaVencimento, setDiaVencimento] = useState(
-    editando?.dia_vencimento != null ? String(editando.dia_vencimento) : ''
-  )
   const [observacao, setObservacao] = useState(base?.observacao ?? '')
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -57,9 +54,6 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
 
   const categoriasFiltradas = categories.filter((c) => c.tipo === tipo)
   const modoEdicao = !!editando
-  // Dia de vencimento só faz sentido pra despesa recorrente ou parcelada —
-  // uma despesa avulsa não tem "todo mês vence dia X".
-  const mostrarDiaVencimento = tipo === 'despesa' && (parcelado || recorrente)
 
   async function salvarUnico(aplicarATodasAsParcelas: boolean) {
     const payload = {
@@ -73,7 +67,6 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
       competencia_mes: competenciaMes,
       competencia_ano: competenciaAno,
       recorrente,
-      dia_vencimento: diaVencimento ? Number(diaVencimento) : null,
       observacao: observacao || null,
     }
 
@@ -81,8 +74,6 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
       if (aplicarATodasAsParcelas && editando.grupo_parcelamento_id) {
         // Campos compartilhados entre todas as parcelas do grupo — NUNCA propaga
         // competência, data, pago ou valor efetivo, que são específicos de cada parcela.
-        // O dia de vencimento entra aqui de propósito: parcelas da mesma compra
-        // costumam vencer sempre no mesmo dia do mês.
         const { error: erroGrupo } = await supabase
           .from('transactions')
           .update({
@@ -90,7 +81,6 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
             categoria_id: categoriaId || null,
             meio_pagamento_id: meioId || null,
             valor: Number(valor.replace(',', '.')),
-            dia_vencimento: diaVencimento ? Number(diaVencimento) : null,
           })
           .eq('grupo_parcelamento_id', editando.grupo_parcelamento_id)
 
@@ -127,7 +117,6 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
         parcela_total: parcelaTotal,
         grupo_parcelamento_id: grupoId,
         recorrente: false,
-        dia_vencimento: diaVencimento ? Number(diaVencimento) : null,
         observacao: observacao || null,
       })
 
@@ -146,13 +135,11 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
   // competência, data, pago ou efetivo de UMA parcela nunca deveria vazar pras outras.
   function camposCompartilhaveisMudaram(): boolean {
     if (!editando) return false
-    const novoDiaVencimento = diaVencimento ? Number(diaVencimento) : null
     return (
       descricao !== editando.descricao ||
       (categoriaId || null) !== editando.categoria_id ||
       (meioId || null) !== editando.meio_pagamento_id ||
-      Number(valor.replace(',', '.')) !== Number(editando.valor) ||
-      novoDiaVencimento !== editando.dia_vencimento
+      Number(valor.replace(',', '.')) !== Number(editando.valor)
     )
   }
 
@@ -311,21 +298,6 @@ export default function TransactionForm({ tipoInicial, prefill, editando, onSave
           </label>
         </div>
       )}
-
-      {mostrarDiaVencimento && (
-        <label className="field">
-          <span>Dia de vencimento (1 a 31) — opcional</span>
-          <input
-            type="number"
-            min={1}
-            max={31}
-            value={diaVencimento}
-            onChange={(e) => setDiaVencimento(e.target.value)}
-            placeholder="Ex: 10"
-          />
-        </label>
-      )}
-
       {!(parcelado && !modoEdicao) && (
         <p className="field-hint" style={{ marginTop: -8 }}>
           Um lançamento é considerado pago quando tem valor efetivo maior que zero — não existe

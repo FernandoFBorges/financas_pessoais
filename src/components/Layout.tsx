@@ -1,17 +1,14 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useCompetencia } from '../context/CompetenciaContext'
 import { useTheme } from '../context/ThemeContext'
 import { MESES } from '../lib/types'
-import VencimentosAlerta from './VencimentosAlerta'
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { signOut } = useAuth()
   const { mes, ano, setMes, setAno, proximoMes, mesAnterior } = useCompetencia()
   const { theme, toggleTheme } = useTheme()
-  const location = useLocation()
-  const naTelaDeLancamentos = location.pathname === '/'
 
   const [colapsada, setColapsada] = useState(() => localStorage.getItem('sidebarColapsada') === '1')
 
@@ -88,7 +85,6 @@ export default function Layout({ children }: { children: ReactNode }) {
             />
             <button className="tab-arrow" onClick={proximoMes} aria-label="Próximo mês">›</button>
           </div>
-          {naTelaDeLancamentos && <VencimentosAlerta />}
         </header>
 
         <main className="content">{children}</main>
