@@ -118,6 +118,18 @@ export default function Gerencial() {
 
       const comprometimento = receitaSemEmprestimo > 0 ? (despesaEfetivo / receitaSemEmprestimo) * 100 : null
 
+      // Versões com a despesa PREVISTA (o que estava planejado gastar), contra a
+      // receita real e contra a receita prevista — ambas sem empréstimo, igual à
+      // linha original, pra as três serem comparáveis.
+      const despesaPrevisto = despesas.reduce((s, t) => s + Number(t.valor), 0)
+      const receitaPrevistoSemEmprestimo = receitas
+        .filter((t) => nomeCategoria(t.categoria_id) !== 'Empréstimo')
+        .reduce((s, t) => s + Number(t.valor), 0)
+      const comprometimentoPrevReal =
+        receitaSemEmprestimo > 0 ? (despesaPrevisto / receitaSemEmprestimo) * 100 : null
+      const comprometimentoPrevPrev =
+        receitaPrevistoSemEmprestimo > 0 ? (despesaPrevisto / receitaPrevistoSemEmprestimo) * 100 : null
+
       // Salário x PJ x Outras, em proporção da receita do mês (sem empréstimo)
       const salarioEfetivo = receitas
         .filter((t) => nomeCategoria(t.categoria_id) === 'Salário')
@@ -136,6 +148,8 @@ export default function Gerencial() {
         fixas: despesaFixaEfetivo,
         variaveis: despesaVariavelEfetivo,
         comprometimento,
+        comprometimentoPrevReal,
+        comprometimentoPrevPrev,
         salarioPct: receitaSemEmprestimo > 0 ? (salarioEfetivo / receitaSemEmprestimo) * 100 : 0,
         pjPct: receitaSemEmprestimo > 0 ? (pjEfetivo / receitaSemEmprestimo) * 100 : 0,
         outrasPct: receitaSemEmprestimo > 0 ? (outrasEfetivo / receitaSemEmprestimo) * 100 : 0,
@@ -293,20 +307,44 @@ export default function Gerencial() {
 
           <div className="ledger-card chart-card">
             <h3 className="chart-title">% da renda comprometida com despesas</h3>
-            <p className="chart-caption">Não considera "Empréstimo" como renda. Meses com 💰 tiveram entrada de empréstimo.</p>
+            <p className="chart-caption">
+              Não considera "Empréstimo" como renda (nem na receita real, nem na prevista). Meses com 💰 tiveram
+              entrada de empréstimo. Linhas tracejadas usam a despesa prevista.
+            </p>
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={dadosMensais}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                 <XAxis dataKey="competencia" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} width={50} />
                 <Tooltip formatter={(v) => (v == null ? 'sem receita' : `${Number(v).toFixed(0)}%`)} />
+                <Legend />
                 <Line
                   type="monotone"
                   dataKey="comprometimento"
-                  name="% comprometido"
+                  name="Despesa real ÷ receita real"
                   stroke="var(--color-despesa)"
                   strokeWidth={2.5}
                   dot={{ r: 3 }}
+                  connectNulls={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="comprometimentoPrevReal"
+                  name="Despesa prevista ÷ receita real"
+                  stroke="var(--color-gold)"
+                  strokeWidth={2}
+                  strokeDasharray="6 4"
+                  dot={{ r: 2.5 }}
+                  connectNulls={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="comprometimentoPrevPrev"
+                  name="Despesa prevista ÷ receita prevista"
+                  stroke="var(--color-primary)"
+                  strokeWidth={2}
+                  strokeDasharray="2 4"
+                  dot={{ r: 2.5 }}
                   connectNulls={false}
                 />
               </LineChart>
