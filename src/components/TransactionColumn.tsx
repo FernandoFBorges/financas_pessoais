@@ -3,6 +3,7 @@ import { estaPago, formatBRL, valorEfetivoRealizado, type Category, type Payment
 
 type Agrupamento = 'nenhum' | 'categoria' | 'meio' | 'pago'
 type FiltroPago = 'todos' | 'pago' | 'pendente'
+type FiltroTipo = 'todos' | 'recorrente' | 'parcelada' | 'ambas'
 type ColKey = 'descricao' | 'categoria' | 'meio' | 'data' | 'criado' | 'previsto' | 'efetivo'
 type SortDir = 'asc' | 'desc'
 type FiltroPopoverKey = 'categoria' | 'meio' | null
@@ -18,6 +19,13 @@ const COLUMN_LABELS: Record<ColKey, string> = {
 }
 
 const DEFAULT_ORDER: ColKey[] = ['descricao', 'categoria', 'meio', 'data', 'criado', 'previsto', 'efetivo']
+
+// Parcelada = faz parte de um grupo criado pelo app OU tem número de parcela.
+// As parcelas importadas das planilhas vêm só com "3/8", sem grupo — esse é o
+// mesmo critério do selo "3/8" que aparece na grade.
+function ehParcelada(t: Transaction) {
+  return t.grupo_parcelamento_id != null || (t.parcela_atual != null && t.parcela_total != null)
+}
 
 interface Props {
   tipo: Tipo
@@ -46,6 +54,7 @@ export default function TransactionColumn({
   const [filtroCategoria, setFiltroCategoria] = useState('')
   const [filtroMeio, setFiltroMeio] = useState('')
   const [filtroPago, setFiltroPago] = useState<FiltroPago>('todos')
+  const [filtroTipo, setFiltroTipo] = useState<FiltroTipo>('todos')
   const [agrupamento, setAgrupamento] = useState<Agrupamento>('nenhum')
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [efetivoInput, setEfetivoInput] = useState('')
@@ -83,6 +92,9 @@ export default function TransactionColumn({
     if (filtroMeio && t.meio_pagamento_id !== filtroMeio) return false
     if (filtroPago === 'pago' && !estaPago(t)) return false
     if (filtroPago === 'pendente' && estaPago(t)) return false
+    if (filtroTipo === 'recorrente' && !t.recorrente) return false
+    if (filtroTipo === 'parcelada' && !ehParcelada(t)) return false
+    if (filtroTipo === 'ambas' && !(t.recorrente || ehParcelada(t))) return false
     return true
   })
 
@@ -413,6 +425,12 @@ export default function TransactionColumn({
                 <option value="todos">Pago e pendente</option>
                 <option value="pago">Só pagos</option>
                 <option value="pendente">Só pendentes</option>
+              </select>
+              <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value as FiltroTipo)}>
+                <option value="todos">Todos os tipos</option>
+                <option value="recorrente">Só recorrentes</option>
+                <option value="parcelada">Só parceladas</option>
+                <option value="ambas">Recorrentes e parceladas</option>
               </select>
               <select value={agrupamento} onChange={(e) => setAgrupamento(e.target.value as Agrupamento)}>
                 <option value="nenhum">Sem agrupamento</option>
