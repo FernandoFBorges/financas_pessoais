@@ -4,7 +4,7 @@ import { estaPago, formatBRL, valorEfetivoRealizado, type Category, type Payment
 type Agrupamento = 'nenhum' | 'categoria' | 'meio' | 'pago'
 type FiltroPago = 'todos' | 'pago' | 'pendente'
 type FiltroTipo = 'todos' | 'recorrente' | 'parcelada' | 'ambas'
-type ColKey = 'descricao' | 'categoria' | 'meio' | 'data' | 'criado' | 'previsto' | 'efetivo'
+type ColKey = 'descricao' | 'categoria' | 'meio' | 'data' | 'parcela' | 'criado' | 'previsto' | 'efetivo'
 type SortDir = 'asc' | 'desc'
 type FiltroPopoverKey = 'categoria' | 'meio' | null
 
@@ -13,18 +13,25 @@ const COLUMN_LABELS: Record<ColKey, string> = {
   categoria: 'Categoria',
   meio: 'Meio de pagamento',
   data: 'Data de lançamento',
+  parcela: 'Parcela',
   criado: 'Registrado em',
   previsto: 'Vlr. previsto',
   efetivo: 'Vlr. efetivo',
 }
 
-const DEFAULT_ORDER: ColKey[] = ['descricao', 'categoria', 'meio', 'data', 'criado', 'previsto', 'efetivo']
+const DEFAULT_ORDER: ColKey[] = ['descricao', 'categoria', 'meio', 'data', 'parcela', 'criado', 'previsto', 'efetivo']
 
 // Parcelada = faz parte de um grupo criado pelo app OU tem número de parcela.
 // As parcelas importadas das planilhas vêm só com "3/8", sem grupo — esse é o
 // mesmo critério do selo "3/8" que aparece na grade.
 function ehParcelada(t: Transaction) {
   return t.grupo_parcelamento_id != null || (t.parcela_atual != null && t.parcela_total != null)
+}
+
+// Quantas parcelas ainda faltam DEPOIS da deste mês (7/8 → 1, 2/5 → 3, 8/8 → 0).
+// Quanto menor, mais cedo o parcelamento termina. Null = não é parcelada.
+function parcelasRestantes(t: Transaction): number | null {
+  return t.parcela_atual != null && t.parcela_total != null ? t.parcela_total - t.parcela_atual : null
 }
 
 interface Props {
@@ -220,6 +227,7 @@ export default function TransactionColumn({
       case 'categoria': return nomeCategoria(t.categoria_id).toLowerCase()
       case 'meio': return nomeMeio(t.meio_pagamento_id).toLowerCase()
       case 'data': return t.data_lancamento
+      case 'parcela': return parcelasRestantes(t) ?? 0 // a ordem de verdade (com não-parceladas no fim) é tratada em "ordenados"
       case 'criado': return t.created_at
       case 'previsto': return Number(t.valor)
       case 'efetivo': return valorEfetivoRealizado(t)
@@ -230,6 +238,16 @@ export default function TransactionColumn({
     if (!sortKey) return filtrados
     const copia = [...filtrados]
     copia.sort((a, b) => {
+      if (sortKey === 'parcela') {
+        // Quem não é parcelado fica sempre no fim, tanto na ordem crescente quanto
+        // na decrescente — senão as avulsas dominariam o topo ao inverter.
+        const ra = parcelasRestantes(a)
+        const rb = parcelasRestantes(b)
+        if (ra == null && rb == null) return 0
+        if (ra == null) return 1
+        if (rb == null) return -1
+        return sortDir === 'asc' ? ra - rb : rb - ra
+      }
       const va = campoOrdenavel(a, sortKey)
       const vb = campoOrdenavel(b, sortKey)
       const cmp = va < vb ? -1 : va > vb ? 1 : 0
@@ -362,6 +380,16 @@ export default function TransactionColumn({
       case 'categoria': return nomeCategoria(t.categoria_id)
       case 'meio': return nomeMeio(t.meio_pagamento_id)
       case 'data': return new Date(t.data_lancamento + 'T00:00:00').toLocaleDateString('pt-BR')
+      case 'parcela': {
+        const restantes = parcelasRestantes(t)
+        if (restantes == null) return '—'
+        return (
+          <span className="parcela-cell">
+            <span className="mono">{t.parcela_atual}/{t.parcela_total}</span>
+            <span className="parcela-restantes">{restantes === 0 ? 'última' : `faltam ${restantes}`}</span>
+          </span>
+        )
+      }
       case 'criado': {
         const d = new Date(t.created_at)
         return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -524,7 +552,11 @@ export default function TransactionColumn({
                   >
                     <span className="grid-th-inner">
                       <span className="drag-grip">⠿</span>
-                      <span onClick={() => alternarOrdenacao(key)} className="grid-th-label">
+                      <span
+                        onClick={() => alternarOrdenacao(key)}
+                        className="grid-th-label"
+                        title={key === 'parcela' ? '▲ terminam primeiro (faltam menos parcelas) · ▼ terminam por último' : undefined}
+                      >
                         {COLUMN_LABELS[key]}
                         {sortKey === key && <span className="sort-arrow">{sortDir === 'asc' ? '▲' : '▼'}</span>}
                       </span>

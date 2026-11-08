@@ -1218,6 +1218,17 @@ body {
   color: var(--color-primary);
 }
 
+.parcela-cell {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.parcela-restantes {
+  font-size: 10.5px;
+  color: var(--color-ink-soft);
+}
+
 .empty-state {
   color: var(--color-ink-soft);
   font-size: 14px;
