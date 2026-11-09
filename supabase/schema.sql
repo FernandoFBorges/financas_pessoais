@@ -229,6 +229,9 @@ alter table user_settings
 --  - Parcela "terminou no mês" = parcela_atual = parcela_total.
 --  - Parcela "termina no mês seguinte" = falta 1 parcela (7/8) e a última
 --    parcela da mesma compra NÃO está já no próprio mês (caso de antecipação).
+--  - Parcela "começa" = parcela 1 de uma compra com mais de 1 parcela (1/10).
+--    "Começa no mês seguinte" só aparece se essas parcelas já estiverem
+--    lançadas no mês seguinte (o app cria todas as parcelas de uma vez).
 --  - Saldo e reserva: mesma conta do Dashboard.
 -- =========================================================
 
@@ -318,6 +321,19 @@ terminam as (
         and f.grupo_parcelamento_id is not distinct from m.grupo_parcelamento_id
     )
 ),
+comecam as (
+  select descricao, parcela_atual, parcela_total, valor
+  from mes
+  where tipo = 'despesa'
+    and parcela_atual = 1 and parcela_total is not null and parcela_total > 1
+),
+comecam_prox as (
+  select descricao, parcela_atual, parcela_total, valor
+  from base
+  where tipo = 'despesa'
+    and seq = p_ano * 12 + p_mes + 1
+    and parcela_atual = 1 and parcela_total is not null and parcela_total > 1
+),
 pendentes as (
   select
     count(*) filter (where tipo = 'despesa') as desp_qtd,
@@ -399,8 +415,30 @@ select jsonb_build_object(
         ) order by x.descricao
       ) from terminam x
     ), '[]'::jsonb),
+    'comecam_mes', coalesce((
+      select jsonb_agg(
+        jsonb_build_object(
+          'descricao', c.descricao,
+          'parcela_atual', c.parcela_atual,
+          'parcela_total', c.parcela_total,
+          'valor', c.valor
+        ) order by c.descricao
+      ) from comecam c
+    ), '[]'::jsonb),
+    'comecam_proximo_mes', coalesce((
+      select jsonb_agg(
+        jsonb_build_object(
+          'descricao', c.descricao,
+          'parcela_atual', c.parcela_atual,
+          'parcela_total', c.parcela_total,
+          'valor', c.valor
+        ) order by c.descricao
+      ) from comecam_prox c
+    ), '[]'::jsonb),
     'libera_no_mes_seguinte', (select coalesce(sum(valor), 0) from finalizadas),
-    'libera_dois_meses_depois', (select coalesce(sum(valor), 0) from terminam)
+    'libera_dois_meses_depois', (select coalesce(sum(valor), 0) from terminam),
+    'entra_no_mes', (select coalesce(sum(valor), 0) from comecam),
+    'entra_no_mes_seguinte', (select coalesce(sum(valor), 0) from comecam_prox)
   ),
   'pendentes', jsonb_build_object(
     'despesas', jsonb_build_object('qtd', p.desp_qtd, 'valor', p.desp_valor),

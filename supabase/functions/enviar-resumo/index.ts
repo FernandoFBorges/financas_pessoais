@@ -58,6 +58,11 @@ interface Resumo {
     terminam_proximo_mes: ItemParcela[]
     libera_no_mes_seguinte: number
     libera_dois_meses_depois: number
+    // opcionais: só existem depois de rodar a versão nova da função SQL
+    comecam_mes?: ItemParcela[]
+    comecam_proximo_mes?: ItemParcela[]
+    entra_no_mes?: number
+    entra_no_mes_seguinte?: number
   }
   pendentes: { despesas: { qtd: number; valor: number }; receitas: { qtd: number; valor: number } }
   saldo: {
@@ -203,11 +208,22 @@ function montarHtml(r: Resumo): { assunto: string; html: string } {
       linha(`Libera a partir de ${rotuloMes(depois.ano, depois.mes)} (as que terminam em ${MESES[prox.mes - 1]})`, brl(r.parcelas.libera_dois_meses_depois), { cor: COR.receita }),
     )
   }
+  const comecam = r.parcelas.comecam_mes ?? []
+  const comecamProx = r.parcelas.comecam_proximo_mes ?? []
+  const subtitulo = (texto: string, topo = 14) =>
+    `<div style="font-size:13px;font-weight:700;color:${COR.tinta};padding:${topo}px 0 4px 0;">${texto}</div>`
+  const porMes = (valor: number | undefined) =>
+    valor && valor > 0 ? ` · <span style="color:${COR.despesa};">${brl(valor)} por mês</span>` : ''
   const parcelas =
-    `<div style="font-size:13px;font-weight:700;color:${COR.tinta};padding:2px 0 4px 0;">Terminaram em ${MESES[r.mes - 1]} (${r.parcelas.finalizadas.length})</div>` +
+    subtitulo(`Terminaram em ${MESES[r.mes - 1]} (${r.parcelas.finalizadas.length})`, 2) +
     listaParcelas(r.parcelas.finalizadas) +
-    `<div style="font-size:13px;font-weight:700;color:${COR.tinta};padding:14px 0 4px 0;">Terminam em ${MESES[prox.mes - 1]} (${r.parcelas.terminam_proximo_mes.length})</div>` +
+    subtitulo(`Terminam em ${MESES[prox.mes - 1]} (${r.parcelas.terminam_proximo_mes.length})`) +
     listaParcelas(r.parcelas.terminam_proximo_mes) +
+    subtitulo(`Começam em ${MESES[r.mes - 1]} (${comecam.length})${porMes(r.parcelas.entra_no_mes)}`) +
+    listaParcelas(comecam) +
+    subtitulo(`Começam em ${MESES[prox.mes - 1]} (${comecamProx.length})${porMes(r.parcelas.entra_no_mes_seguinte)}`) +
+    listaParcelas(comecamProx) +
+    `<div style="font-size:11px;color:${COR.suave};padding-top:4px;">Considera só o que já está lançado em ${MESES[prox.mes - 1]}.</div>` +
     (liberaLinhas.length ? `<div style="padding-top:10px;">${tabela(liberaLinhas.join(''))}</div>` : '')
 
   // ----- Pendentes
@@ -292,6 +308,11 @@ function montarTexto(r: Resumo): string {
     xs.length ? xs.map((p) => `  - ${p.descricao} ${p.parcela_atual}/${p.parcela_total} (${brl(p.valor)})`) : ['  Nenhuma.']
   L.push('', `PARCELAS QUE TERMINARAM EM ${MESES[r.mes - 1].toUpperCase()}`, ...itens(r.parcelas.finalizadas))
   L.push('', `PARCELAS QUE TERMINAM EM ${MESES[prox.mes - 1].toUpperCase()}`, ...itens(r.parcelas.terminam_proximo_mes))
+  const entra = r.parcelas.entra_no_mes ?? 0
+  const entraProx = r.parcelas.entra_no_mes_seguinte ?? 0
+  L.push('', `PARCELAS QUE COMEÇAM EM ${MESES[r.mes - 1].toUpperCase()}${entra > 0 ? ` (${brl(entra)} por mês)` : ''}`, ...itens(r.parcelas.comecam_mes ?? []))
+  L.push('', `PARCELAS QUE COMEÇAM EM ${MESES[prox.mes - 1].toUpperCase()}${entraProx > 0 ? ` (${brl(entraProx)} por mês)` : ''}`, ...itens(r.parcelas.comecam_proximo_mes ?? []))
+  L.push(`  (considera só o que já está lançado em ${MESES[prox.mes - 1]})`)
   if (r.parcelas.libera_no_mes_seguinte > 0) L.push(`  Libera já em ${rotuloMes(prox.ano, prox.mes)}: ${brl(r.parcelas.libera_no_mes_seguinte)}`)
   if (r.parcelas.libera_dois_meses_depois > 0) L.push(`  Libera a partir de ${rotuloMes(depois.ano, depois.mes)}: ${brl(r.parcelas.libera_dois_meses_depois)}`)
   L.push('', 'PENDENTES DO MÊS')
