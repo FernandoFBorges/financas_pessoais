@@ -216,9 +216,11 @@ alter table user_settings
 -- RLS das tabelas continua valendo (cada usuário só enxerga o que é seu).
 --
 -- Regras (as mesmas do restante do app):
---  - Valores sempre pelo EFETIVO (valor_efetivo), nunca pelo previsto.
---    Exceção: "pendentes" e "libera na folha" usam o previsto, porque são
---    justamente coisas que ainda não foram pagas / valores de parcela.
+--  - Entradas e saídas saem nas DUAS visões: REAL (valor_efetivo, o que já foi
+--    pago/recebido) e PREVISTO (valor, o que está programado no mês). Num mês
+--    em andamento só o previsto mostra "quanto vai ser". Os percentuais de cada
+--    visão usam a própria base (previsto ÷ previsto, real ÷ real).
+--    Pendentes e valores de parcela usam o previsto.
 --  - Entradas: "Salário" e "Outras". Categoria "Empréstimo" fica à parte e
 --    NÃO conta como renda (nem nos percentuais).
 --  - Grupos de despesa (disjuntos, somam o total de despesas):
@@ -269,7 +271,10 @@ entradas as (
     coalesce(sum(efetivo) filter (where categoria = 'Salário'), 0) as salario,
     coalesce(sum(efetivo) filter (where categoria = 'Empréstimo'), 0) as emprestimo,
     coalesce(sum(efetivo) filter (where coalesce(categoria, '') not in ('Salário', 'Empréstimo')), 0) as outras,
-    coalesce(sum(efetivo), 0) as total_com_emprestimo
+    coalesce(sum(efetivo), 0) as total_com_emprestimo,
+    coalesce(sum(valor) filter (where categoria = 'Salário'), 0) as salario_previsto,
+    coalesce(sum(valor) filter (where categoria = 'Empréstimo'), 0) as emprestimo_previsto,
+    coalesce(sum(valor) filter (where coalesce(categoria, '') not in ('Salário', 'Empréstimo')), 0) as outras_previsto
   from mes
   where tipo = 'receita'
 ),
@@ -285,14 +290,19 @@ desp as (
   where tipo = 'despesa'
 ),
 saidas as (
-  select coalesce(sum(efetivo), 0) as total from desp
+  select
+    coalesce(sum(efetivo), 0) as total,
+    coalesce(sum(valor), 0) as total_previsto
+  from desp
 ),
 grupos as (
   select
     g.ord,
     g.chave,
     count(d.grupo) as qtd,
-    coalesce(sum(d.efetivo), 0) as valor
+    count(d.grupo) filter (where d.efetivo > 0) as qtd_pagas,
+    coalesce(sum(d.efetivo), 0) as valor,
+    coalesce(sum(d.valor), 0) as valor_previsto
   from (values (1, 'recorrentes'), (2, 'parceladas'), (3, 'variaveis')) as g(ord, chave)
   left join desp d on d.grupo = g.chave
   group by g.ord, g.chave
@@ -375,19 +385,29 @@ select jsonb_build_object(
     'outras', e.outras,
     'renda', e.salario + e.outras,
     'emprestimo', e.emprestimo,
-    'total_com_emprestimo', e.total_com_emprestimo
+    'total_com_emprestimo', e.total_com_emprestimo,
+    'salario_previsto', e.salario_previsto,
+    'outras_previsto', e.outras_previsto,
+    'renda_previsto', e.salario_previsto + e.outras_previsto,
+    'emprestimo_previsto', e.emprestimo_previsto
   ),
   'saidas', jsonb_build_object(
     'total', s.total,
+    'total_previsto', s.total_previsto,
     'grupos', (
       select jsonb_agg(
         jsonb_build_object(
           'chave', g.chave,
           'qtd', g.qtd,
+          'qtd_pagas', g.qtd_pagas,
           'valor', g.valor,
           'pct_despesas', round(100 * g.valor / nullif(s.total, 0), 2),
           'pct_salario', round(100 * g.valor / nullif(e.salario, 0), 2),
-          'pct_renda', round(100 * g.valor / nullif(e.salario + e.outras, 0), 2)
+          'pct_renda', round(100 * g.valor / nullif(e.salario + e.outras, 0), 2),
+          'valor_previsto', g.valor_previsto,
+          'prev_pct_despesas', round(100 * g.valor_previsto / nullif(s.total_previsto, 0), 2),
+          'prev_pct_salario', round(100 * g.valor_previsto / nullif(e.salario_previsto, 0), 2),
+          'prev_pct_renda', round(100 * g.valor_previsto / nullif(e.salario_previsto + e.outras_previsto, 0), 2)
         )
         order by g.ord
       )
