@@ -1677,3 +1677,47 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- Resumo (e-mail mensal) ---------- */
+
+.resumo-page {
+  max-width: 760px;
+}
+
+.resumo-card {
+  margin-bottom: 16px;
+}
+
+.resumo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.resumo-sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--color-ink-soft);
+}
+
+.resumo-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.resumo-frame-wrap {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background: #f3f6fb;
+}
+
+.resumo-frame {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: #f3f6fb;
+}

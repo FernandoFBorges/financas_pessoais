@@ -42,6 +42,10 @@ export default function Layout({ children }: { children: ReactNode }) {
             <span className="nav-icon">📊</span>
             <span className="nav-label">Gerencial</span>
           </NavLink>
+          <NavLink to="/resumo" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')} title="Resumo">
+            <span className="nav-icon">✉️</span>
+            <span className="nav-label">Resumo</span>
+          </NavLink>
           <NavLink to="/config" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')} title="Categorias & meios">
             <span className="nav-icon">🏷️</span>
             <span className="nav-label">Categorias &amp; meios</span>

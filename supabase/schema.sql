@@ -206,3 +206,219 @@ create index if not exists idx_reserva_competencia
 
 alter table user_settings
   add column if not exists tema text check (tema in ('light', 'dark'));
+
+-- =========================================================
+-- Migração — resumo mensal (e-mail "Resumo" + tela Resumo)
+-- Rode uma vez no SQL Editor do Supabase.
+--
+-- A função calcula TODOS os números do resumo de uma competência.
+-- É "security invoker": roda com as permissões de quem chamou, então o
+-- RLS das tabelas continua valendo (cada usuário só enxerga o que é seu).
+--
+-- Regras (as mesmas do restante do app):
+--  - Valores sempre pelo EFETIVO (valor_efetivo), nunca pelo previsto.
+--    Exceção: "pendentes" e "libera na folha" usam o previsto, porque são
+--    justamente coisas que ainda não foram pagas / valores de parcela.
+--  - Entradas: "Salário" e "Outras". Categoria "Empréstimo" fica à parte e
+--    NÃO conta como renda (nem nos percentuais).
+--  - Grupos de despesa (disjuntos, somam o total de despesas):
+--      recorrentes = marcado como recorrente
+--      parceladas  = tem número de parcela OU grupo de parcelamento
+--      variaveis   = o resto
+--    (se um lançamento for recorrente E parcelado, conta como recorrente)
+--  - Parcela "terminou no mês" = parcela_atual = parcela_total.
+--  - Parcela "termina no mês seguinte" = falta 1 parcela (7/8) e a última
+--    parcela da mesma compra NÃO está já no próprio mês (caso de antecipação).
+--  - Saldo e reserva: mesma conta do Dashboard.
+-- =========================================================
+
+create or replace function resumo_mensal(p_ano integer, p_mes integer)
+returns jsonb
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+with
+base as (
+  select
+    t.tipo,
+    t.descricao,
+    t.valor,
+    coalesce(t.valor_efetivo, 0) as efetivo,
+    t.competencia_ano * 12 + t.competencia_mes as seq,
+    t.recorrente,
+    t.parcela_atual,
+    t.parcela_total,
+    t.grupo_parcelamento_id,
+    c.nome as categoria,
+    (t.grupo_parcelamento_id is not null
+       or (t.parcela_atual is not null and t.parcela_total is not null)) as parcelada
+  from transactions t
+  left join categories c on c.id = t.categoria_id
+  where t.user_id = auth.uid()
+),
+mes as (
+  select * from base where seq = p_ano * 12 + p_mes
+),
+entradas as (
+  select
+    coalesce(sum(efetivo) filter (where categoria = 'Salário'), 0) as salario,
+    coalesce(sum(efetivo) filter (where categoria = 'Empréstimo'), 0) as emprestimo,
+    coalesce(sum(efetivo) filter (where coalesce(categoria, '') not in ('Salário', 'Empréstimo')), 0) as outras,
+    coalesce(sum(efetivo), 0) as total_com_emprestimo
+  from mes
+  where tipo = 'receita'
+),
+desp as (
+  select
+    *,
+    case
+      when recorrente then 'recorrentes'
+      when parcelada then 'parceladas'
+      else 'variaveis'
+    end as grupo
+  from mes
+  where tipo = 'despesa'
+),
+saidas as (
+  select coalesce(sum(efetivo), 0) as total from desp
+),
+grupos as (
+  select
+    g.ord,
+    g.chave,
+    count(d.grupo) as qtd,
+    coalesce(sum(d.efetivo), 0) as valor
+  from (values (1, 'recorrentes'), (2, 'parceladas'), (3, 'variaveis')) as g(ord, chave)
+  left join desp d on d.grupo = g.chave
+  group by g.ord, g.chave
+),
+finalizadas as (
+  select descricao, parcela_atual, parcela_total, valor
+  from mes
+  where tipo = 'despesa'
+    and parcela_atual is not null and parcela_total is not null
+    and parcela_atual = parcela_total
+),
+terminam as (
+  select m.descricao, m.parcela_atual, m.parcela_total, m.valor
+  from mes m
+  where m.tipo = 'despesa'
+    and m.parcela_atual is not null and m.parcela_total is not null
+    and m.parcela_total - m.parcela_atual = 1
+    and not exists (
+      select 1
+      from mes f
+      where f.tipo = 'despesa'
+        and f.parcela_atual is not null and f.parcela_total is not null
+        and f.parcela_atual = f.parcela_total
+        and f.descricao = m.descricao
+        and f.parcela_total = m.parcela_total
+        and f.grupo_parcelamento_id is not distinct from m.grupo_parcelamento_id
+    )
+),
+pendentes as (
+  select
+    count(*) filter (where tipo = 'despesa') as desp_qtd,
+    coalesce(sum(valor) filter (where tipo = 'despesa'), 0) as desp_valor,
+    count(*) filter (where tipo = 'receita') as rec_qtd,
+    coalesce(sum(valor) filter (where tipo = 'receita'), 0) as rec_valor
+  from mes
+  where not (efetivo > 0)
+),
+config as (
+  select coalesce(
+    (select saldo_inicial from user_settings where user_id = auth.uid()), 0
+  ) as saldo_inicial
+),
+acumulado as (
+  select coalesce(sum(case when tipo = 'receita' then efetivo else -efetivo end), 0) as valor
+  from base
+  where seq < p_ano * 12 + p_mes
+),
+reserva_ant as (
+  select coalesce(sum(case when tipo = 'deposito' then valor else -valor end), 0) as net
+  from reserva_movimentos
+  where user_id = auth.uid()
+    and competencia_ano * 12 + competencia_mes < p_ano * 12 + p_mes
+),
+reserva_mes as (
+  select
+    coalesce(sum(valor) filter (where tipo = 'deposito'), 0) as depositos,
+    coalesce(sum(valor) filter (where tipo = 'resgate'), 0) as resgates
+  from reserva_movimentos
+  where user_id = auth.uid()
+    and competencia_ano = p_ano and competencia_mes = p_mes
+)
+select jsonb_build_object(
+  'ano', p_ano,
+  'mes', p_mes,
+  'entradas', jsonb_build_object(
+    'salario', e.salario,
+    'outras', e.outras,
+    'renda', e.salario + e.outras,
+    'emprestimo', e.emprestimo,
+    'total_com_emprestimo', e.total_com_emprestimo
+  ),
+  'saidas', jsonb_build_object(
+    'total', s.total,
+    'grupos', (
+      select jsonb_agg(
+        jsonb_build_object(
+          'chave', g.chave,
+          'qtd', g.qtd,
+          'valor', g.valor,
+          'pct_despesas', round(100 * g.valor / nullif(s.total, 0), 2),
+          'pct_salario', round(100 * g.valor / nullif(e.salario, 0), 2),
+          'pct_renda', round(100 * g.valor / nullif(e.salario + e.outras, 0), 2)
+        )
+        order by g.ord
+      )
+      from grupos g
+    )
+  ),
+  'parcelas', jsonb_build_object(
+    'finalizadas', coalesce((
+      select jsonb_agg(
+        jsonb_build_object(
+          'descricao', f.descricao,
+          'parcela_atual', f.parcela_atual,
+          'parcela_total', f.parcela_total,
+          'valor', f.valor
+        ) order by f.descricao
+      ) from finalizadas f
+    ), '[]'::jsonb),
+    'terminam_proximo_mes', coalesce((
+      select jsonb_agg(
+        jsonb_build_object(
+          'descricao', x.descricao,
+          'parcela_atual', x.parcela_atual,
+          'parcela_total', x.parcela_total,
+          'valor', x.valor
+        ) order by x.descricao
+      ) from terminam x
+    ), '[]'::jsonb),
+    'libera_no_mes_seguinte', (select coalesce(sum(valor), 0) from finalizadas),
+    'libera_dois_meses_depois', (select coalesce(sum(valor), 0) from terminam)
+  ),
+  'pendentes', jsonb_build_object(
+    'despesas', jsonb_build_object('qtd', p.desp_qtd, 'valor', p.desp_valor),
+    'receitas', jsonb_build_object('qtd', p.rec_qtd, 'valor', p.rec_valor)
+  ),
+  'saldo', jsonb_build_object(
+    'inicial', cfg.saldo_inicial + ac.valor - ra.net,
+    'final', (cfg.saldo_inicial + ac.valor - ra.net)
+             + e.total_com_emprestimo - s.total - (rm.depositos - rm.resgates),
+    'reserva_total', ra.net + (rm.depositos - rm.resgates),
+    'reserva_depositos', rm.depositos,
+    'reserva_resgates', rm.resgates,
+    'reserva_liquida_mes', rm.depositos - rm.resgates
+  )
+)
+from entradas e, saidas s, pendentes p, config cfg, acumulado ac,
+     reserva_ant ra, reserva_mes rm;
+$$;
+
+revoke execute on function resumo_mensal(integer, integer) from public, anon;
+grant execute on function resumo_mensal(integer, integer) to authenticated;

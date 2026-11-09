@@ -8,6 +8,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Configuracoes from './pages/Configuracoes'
 import Parametros from './pages/Parametros'
+import Resumo from './pages/Resumo'
 
 const Gerencial = lazy(() => import('./pages/Gerencial'))
 
@@ -35,6 +36,7 @@ function PrivateArea() {
               </Suspense>
             }
           />
+          <Route path="/resumo" element={<Resumo />} />
           <Route path="/config" element={<Configuracoes />} />
           <Route path="/parametros" element={<Parametros />} />
           <Route path="*" element={<Navigate to="/" replace />} />
